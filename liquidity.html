@@ -1,0 +1,752 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Freshers Fair — Liquidity Trading Game</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  </head>
+  <body class="bg-slate-50">
+    <div id="root"></div>
+    <script>
+      const { useState, useEffect, useRef } = React;
+
+      // ---------- Config ----------
+      const TICKER = "SPX";
+
+      // ---------- Utils ----------
+      const fmt2 = n => Number(n).toFixed(2);
+      const clamp = (x,a,b) => Math.max(a, Math.min(b, x));
+      const LB_KEY = "liquidity_fair_leaderboard_v11";
+      const MAX_POS = 1000;
+
+      const loadLB = () => { try { return JSON.parse(localStorage.getItem(LB_KEY)) || []; } catch { return []; } };
+      const saveLB = (arr) => localStorage.setItem(LB_KEY, JSON.stringify(arr));
+
+      // ====== Audio (Web Audio API) ======
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      let audioCtx;
+      try { audioCtx = new AudioCtx(); } catch(e) {}
+
+      function _envGain(gainNode, t0, dur, vol=0.03) {
+        try {
+          gainNode.gain.setValueAtTime(Math.max(0.0001, vol), t0);
+          gainNode.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+        } catch {}
+      }
+      function beep(freq=440, dur=0.15, type="sine", vol=0.03) {
+        if (!audioCtx) return;
+        const t = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        osc.type = type; osc.frequency.value = freq;
+        _envGain(g, t, dur, vol);
+        osc.connect(g).connect(audioCtx.destination);
+        osc.start(t); osc.stop(t + dur);
+      }
+      function chirp(start=400, end=800, dur=0.2, type="sine", vol=0.03) {
+        if (!audioCtx) return;
+        const t = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(start, t);
+        osc.frequency.linearRampToValueAtTime(end, t + dur);
+        _envGain(g, t, dur, vol);
+        osc.connect(g).connect(audioCtx.destination);
+        osc.start(t); osc.stop(t + dur);
+      }
+      function chord(freqs=[440,550,660], dur=0.5, vol=0.02) {
+        if (!audioCtx) return;
+        const t = audioCtx.currentTime;
+        const bus = audioCtx.createGain();
+        bus.gain.setValueAtTime(vol, t);
+        bus.connect(audioCtx.destination);
+        freqs.forEach(f => {
+          const osc = audioCtx.createOscillator();
+          const g = audioCtx.createGain();
+          osc.type = "sine"; osc.frequency.value = f;
+          _envGain(g, t, dur, 1);
+          osc.connect(g).connect(bus);
+          osc.start(t); osc.stop(t + dur);
+        });
+      }
+
+      // ---------- SVG line chart ----------
+      function PriceChart({ data, height=260, title=TICKER, fairLine=null }) {
+        if (!data || data.length === 0) return React.createElement("div", { className: "h-[260px]"});
+        const w = 860, h = height, padL = 56, padR = 16, padT = 26, padB = 26;
+        const ys = data.map(d => d.mid);
+        let minY = Math.min(...ys), maxY = Math.max(...ys);
+        const padPct = 0.03;
+        const midY = (minY + maxY) / 2;
+        const halfRange = Math.max(0.0001, (maxY - minY) / 2);
+        minY = midY - halfRange * (1 + padPct);
+        maxY = midY + halfRange * (1 + padPct);
+        const rangeY = Math.max(1e-6, maxY - minY);
+        const n = data.length;
+
+        const xOf = i => padL + (i / Math.max(1, n-1)) * (w - padL - padR);
+        const yOf = v => h - padB - ((v - minY) / rangeY) * (h - padT - padB);
+
+        const pts = data.map((d,i) => `${xOf(i)},${yOf(d.mid)}`).join(" ");
+
+        const ticks = 5;
+        const yTickElems = [];
+        for (let k=0; k<ticks; k++) {
+          const t = k/(ticks-1);
+          const val = maxY - t*rangeY;
+          const y = yOf(val);
+          yTickElems.push(
+            React.createElement("line", { key: "l"+k, x1: padL, y1: y, x2: w - padR, y2: y, stroke: "#f1f5f9", "stroke-width": 1 }),
+            React.createElement("text", { key: "t"+k, x: padL - 8, y: y + 3, "text-anchor": "end", className: "fill-gray-500 text-[10px] font-medium" }, fmt2(val))
+          );
+        }
+
+        const svgChildren = [
+          React.createElement("line", { key:"ax1", x1: padL, y1: h - padB, x2: w - padR, y2: h - padB, stroke: "#e5e7eb", "stroke-width": 1 }),
+          React.createElement("line", { key:"ax2", x1: padL, y1: padT, x2: padL, y2: h - padB, stroke: "#e5e7eb", "stroke-width": 1 }),
+        ].concat(yTickElems);
+
+        if (fairLine != null) {
+          const yFV = yOf(fairLine);
+          svgChildren.push(
+            React.createElement("line", { key:"fv", x1: padL, y1: yFV, x2: w - padR, y2: yFV, stroke: "#94a3b8", "stroke-width": 1, "stroke-dasharray":"4 4", opacity:0.7 })
+          );
+        }
+
+        svgChildren.push(React.createElement("polyline", { key:"ply", points: pts, fill: "none", stroke: "black", "stroke-width": 2 }));
+        for (let i=0;i<data.length;i++){
+          svgChildren.push(React.createElement("circle",{ key:"c"+i, cx:xOf(i), cy:yOf(data[i].mid), r:2, fill:"black" }));
+        }
+
+        const header = React.createElement("div", { className: "flex items-center justify-between text-xs text-gray-500 mb-1" },
+          React.createElement("div", { className: "font-semibold text-gray-800" }, `${title} — Price`),
+          React.createElement("div", null, `ticks: ${n}`)
+        );
+
+        return React.createElement("div", { className: "p-3 rounded-2xl border shadow-sm bg-white" },
+          header,
+          React.createElement("svg", { viewBox: `0 0 ${w} ${h}`, className: "w-full h-[260px]" }, svgChildren)
+        );
+      }
+
+      // ---------- Macro news ----------
+      const NEWS = [
+        { h:"BoE cuts rates 50bps",            why:"Cheaper borrowing supports equities",              pct:+0.10 },
+        { h:"BoE hikes rates 50bps",           why:"Higher rates weigh on valuations",                 pct:-0.10 },
+        { h:"Fed signals strong dovish turn",  why:"Lower expected path of rates",                     pct:+0.08 },
+        { h:"Fed turns firmly hawkish",        why:"Higher-for-longer rates priced in",               pct:-0.08 },
+        { h:"Inflation cools well below forecast",  why:"Less pressure for hikes",                    pct:+0.05 },
+        { h:"Inflation jumps above expectations",  why:"Hike risks rise",                             pct:-0.05 },
+        { h:"Geopolitical tensions escalate",  why:"Risk-off tone hits indices",                      pct:-0.06 },
+        { h:"Geopolitical de-escalation",      why:"Risk-on tone improves",                           pct:+0.04 },
+        { h:"Mixed data; outlook unchanged",   why:"Little impact on fair value",                     pct: 0.00 },
+        { h:"Energy strength buoys index",     why:"Sector tailwind, modest index uplift",            pct:+0.02 },
+        { h:"Consumer weakens broadly",        why:"Sector headwind, modest index drag",              pct:-0.02 },
+      ];
+      const pickNews = () => NEWS[Math.floor(Math.random()*NEWS.length)];
+
+      // ---------- Fullscreen helpers ----------
+      async function enterFullscreen() {
+        const el = document.documentElement;
+        if (el.requestFullscreen) return el.requestFullscreen();
+        if (el.webkitRequestFullscreen) return el.webkitRequestFullscreen();
+      }
+      async function exitFullscreen() {
+        if (document.exitFullscreen) return document.exitFullscreen();
+        if (document.webkitExitFullscreen) return document.webkitExitFullscreen();
+      }
+
+      function Game(){
+        // screens & mode
+        const [screen, setScreen] = useState("welcome");
+        const [mode, setMode] = useState("normal"); // "normal" | "easy"
+        const [player, setPlayer] = useState("");
+        const [duration, setDuration] = useState(90);
+        const [timeLeft, setTimeLeft] = useState(90);
+        const [kiosk, setKiosk] = useState(false);
+
+        // sound
+        const [soundOn, setSoundOn] = useState(false);
+        async function enableSound() {
+          try {
+            if (!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+            await audioCtx.resume();
+            setSoundOn(true);
+          } catch(e) {}
+        }
+
+        // market state
+        const [mid, _setMid] = useState(100);
+        const [fair, _setFair] = useState(100);
+        const [spread] = useState(0.10);
+
+        // liquidity/impact params
+        const BASE_DEPTH = 1000;
+        const [availDepth, _setAvailDepth] = useState(BASE_DEPTH);
+        const REPLENISH_PER_SEC = 0.10;
+        const IMPACT_MIN = 0.005;
+        const IMPACT_MAX = 0.90;
+        const IMPACT_CURVE_POW = 2.2;
+        const LIQ_POWER = 0.5;
+
+        // randomness (larger, with jumps)
+        const SIGMA_CALM_PCT = 0.0015;
+        const SIGMA_VOL_PCT  = 0.0030;
+        const JUMP_PROB_TICK = 0.001;
+        const JUMP_MIN_PCT   = 0.003;
+        const JUMP_MAX_PCT   = 0.010;
+
+        // session state
+        const [cash, _setCash] = useState(100000);
+        const [reserve, _setReserve] = useState(0); // short proceeds held off-UI
+        const [pos, _setPos] = useState(0);
+        const [tick, setTick] = useState(0);
+        const [hist, setHist] = useState([{t:0, mid:100}]);
+        const [size, setSize] = useState(100);
+
+        const [regime, setRegime] = useState("Calm");
+        const [headline, setHeadline] = useState(null);
+        const [notice, setNotice] = useState("");
+
+        // pause (Easy: 5s on news)
+        const pauseUntilRef = useRef(0);
+
+        // revert boost after big orders
+        const [revertTicks, _setRevertTicks] = useState(0);
+        const [revertStrength, _setRevertStrength] = useState(0);
+
+        // refs
+        const midRef=useRef(100), fairRef=useRef(100), cashRef=useRef(100000), posRef=useRef(0), availRef=useRef(BASE_DEPTH);
+        const reserveRef=useRef(0);
+        const loopRef=useRef(null), startTimeRef=useRef(null), endTimeRef=useRef(null);
+        const scheduleRef=useRef([]), nextNewsIdxRef=useRef(0);
+        const revertTicksRef=useRef(0), revertStrengthRef=useRef(0);
+
+        // setters syncing refs
+        const setMid   = v => { const x=typeof v==="function"?v(midRef.current):v;   midRef.current=x;   _setMid(x); };
+        const setFair  = v => { const x=typeof v==="function"?v(fairRef.current):v;  fairRef.current=x;  _setFair(x); };
+        const setCash  = v => { const x=typeof v==="function"?v(cashRef.current):v;  cashRef.current=x;  _setCash(x); };
+        const setReserve = v => { const x=typeof v==="function"?v(reserveRef.current):v; reserveRef.current=x; _setReserve(x); };
+        const setPos   = v => { const x=typeof v==="function"?v(posRef.current):v;   posRef.current=x;   _setPos(x); };
+        const setAvail = v => { const x=typeof v==="function"?v(availRef.current):v; availRef.current=x; _setAvailDepth(x); };
+        const setRevertTicks = v => { const x=typeof v==="function"?v(revertTicksRef.current):v; revertTicksRef.current=x; _setRevertTicks(x); };
+        const setRevertStrength = v => { const x=typeof v==="function"?v(revertStrengthRef.current):v; revertStrengthRef.current=x; _setRevertStrength(x); };
+
+        const total = cashRef.current + reserveRef.current + posRef.current*midRef.current;
+        const pnl = total - 100000;
+        const pnlColor = pnl>0?"text-green-600":(pnl<0?"text-rose-600":"text-gray-900");
+        const disabled = screen!=="play";
+
+        // drift toward FV (+ optional revert boost)
+        function driftTowardFair(){
+          const d = fairRef.current - midRef.current;
+          const baseFactor = clamp(Math.abs(d)/10, 0, 1);
+          const BETA_PER_SEC = 0.35;
+          const betaTick = BETA_PER_SEC / 10; // 10Hz base
+          let drift = betaTick * d * baseFactor;
+          if (revertTicksRef.current > 0) {
+            drift += revertStrengthRef.current * Math.sign(d) * Math.min(1, Math.abs(d)/0.5);
+            setRevertTicks(t => t - 1);
+            setRevertStrength(s => s * 0.6);
+          }
+          return clamp(drift, -0.12, +0.12);
+        }
+
+        function triggerRevertBoost(qty){
+          if (qty >= 500) {
+            const deviation = fairRef.current - midRef.current;
+            const strength = 0.08 * (qty/1000) * (Math.abs(deviation)/1.0);
+            setRevertStrength(strength);
+            setRevertTicks(5);
+          }
+        }
+
+        function resetRound(){
+          setMid(100); setFair(100);
+          setCash(100000); setReserve(0); setPos(0);
+          setTick(0); setHist([{t:0, mid:100}]);
+          setRegime("Calm"); setHeadline(null); setNotice("");
+          setAvail(BASE_DEPTH);
+          setRevertTicks(0); setRevertStrength(0);
+          pauseUntilRef.current = 0;
+        }
+
+        async function toggleFullscreen(){
+          try {
+            if (!document.fullscreenElement) { await enterFullscreen(); setKiosk(true); }
+            else { await exitFullscreen(); setKiosk(false); }
+          } catch(e){}
+        }
+
+        function start(){
+          if(!player.trim()) return alert("Enter a name to start!");
+          resetRound();
+          setScreen("play");
+          startTimeRef.current = Date.now();
+          endTimeRef.current   = startTimeRef.current + duration*1000;
+          // schedule exactly 5 headlines every 15s
+          scheduleRef.current  = [15,30,45,60,75].map(s => startTimeRef.current + s*1000);
+          nextNewsIdxRef.current = 0;
+        }
+
+        // pause helper for Easy mode (adds to end time & schedules)
+        function pauseFor(ms){
+          const now = Date.now();
+          pauseUntilRef.current = Math.max(pauseUntilRef.current, now + ms);
+          endTimeRef.current += ms;
+          for (let i = nextNewsIdxRef.current; i < scheduleRef.current.length; i++){
+            scheduleRef.current[i] += ms;
+          }
+        }
+
+        // main loop (10Hz normal, ~8Hz easy)
+        useEffect(() => {
+          if (screen!=="play") return;
+          if (loopRef.current) clearInterval(loopRef.current);
+
+          const intervalMs = mode==="easy" ? 125 : 100; // ~8Hz easy vs 10Hz normal
+
+          loopRef.current = setInterval(() => {
+            const now = Date.now();
+
+            // paused? (Easy mode after news)
+            if (now < pauseUntilRef.current) {
+              setTimeLeft(Math.max(0, Math.ceil((endTimeRef.current - now)/1000)));
+              return; // skip ticks while paused
+            }
+
+            const left = Math.max(0, Math.ceil((endTimeRef.current - now)/1000));
+            setTimeLeft(left);
+
+            // base random shock
+            const sigmaPct = regime==="Calm" ? SIGMA_CALM_PCT : SIGMA_VOL_PCT;
+            const sigmaAbs = fairRef.current * sigmaPct;
+            let randomShock = (Math.random()*2 - 1) * sigmaAbs;
+
+            // occasional jump shock
+            if (Math.random() < JUMP_PROB_TICK) {
+              const jMagPct = JUMP_MIN_PCT + Math.random()*(JUMP_MAX_PCT - JUMP_MIN_PCT);
+              const sign = (Math.random()<0.5 ? -1 : +1);
+              randomShock += sign * fairRef.current * jMagPct;
+            }
+
+            // bias towards fair value (+ possible revert boost)
+            const biasShock = driftTowardFair();
+
+            const step = randomShock + biasShock;
+            setMid(m => {
+              const nm = Math.max(1, m + step);
+              setTick(t => { const t2=t+1; setHist(h=>[...h, {t:t2, mid:nm}].slice(-700)); return t2; });
+              return nm;
+            });
+
+            // liquidity replenishment
+            const repl = BASE_DEPTH * (REPLENISH_PER_SEC * (intervalMs/1000)); // per actual loop rate
+            setAvail(a => clamp(a + repl, 50, BASE_DEPTH));
+
+            // occasional regime flip
+            if (Math.random() < 0.03) setRegime(r => r==="Calm"?"Volatile":"Calm");
+
+            // news at fixed schedule
+            const idx = nextNewsIdxRef.current;
+            if (idx < scheduleRef.current.length && now >= scheduleRef.current[idx]) {
+              const n = pickNews();
+              setHeadline(n);
+              if (soundOn) {
+                if (n.pct > 0) beep(740, 0.18, "sine", 0.03);
+                else if (n.pct < 0) beep(330, 0.18, "sine", 0.03);
+                else beep(520, 0.12, "sine", 0.02);
+              }
+              if (n.pct !== 0) setFair(f => Math.max(1, f * (1 + n.pct)));
+              nextNewsIdxRef.current = idx + 1;
+
+              // Easy mode: pause for 5 seconds to think
+              if (mode === "easy") pauseFor(5000);
+            }
+
+            // end round
+            if (left <= 0) {
+              clearInterval(loopRef.current); loopRef.current = null;
+              const finalTotal = cashRef.current + reserveRef.current + posRef.current * midRef.current;
+              const finalPnl = finalTotal - 100000;
+              if (soundOn) {
+                if (finalPnl > 0) chord([523.25, 659.25, 783.99], 0.6, 0.025);
+                else chord([196.00, 233.08, 261.63], 0.6, 0.025);
+              }
+              // Save to leaderboard only for NORMAL mode
+              if (mode === "normal") {
+                const lb = loadLB();
+                const entry = { name: player.trim(), pnl: Number(finalPnl.toFixed(2)), total: Number(finalTotal.toFixed(2)), ts: now };
+                const next = [...lb, entry].sort((a,b)=>b.pnl-a.pnl).slice(0,50);
+                saveLB(next);
+              }
+              setScreen("end");
+            }
+          }, intervalMs);
+
+          return () => { if (loopRef.current) { clearInterval(loopRef.current); loopRef.current=null; } };
+        }, [screen, duration, regime, soundOn, mode]);
+
+        // trading with liquidity impact + VWAP slippage + background short reserve + snap-back trigger
+        function trade(side){
+          if (disabled) return;
+          const reqQty = Math.max(1, Math.round(size));
+          const sgn = side==="BUY" ? +1 : -1;
+
+          // position cap
+          const maxAdd = (sgn>0) ? MAX_POS - posRef.current : MAX_POS + posRef.current;
+          const qty = clamp(reqQty, 0, Math.max(0, maxAdd));
+          if (qty === 0) {
+            setNotice(`Position limit reached (±${MAX_POS} sh).`);
+            setTimeout(()=>setNotice(""), 1200);
+            return;
+          }
+
+          // --- Impact first -> new mid (endMid) ---
+          const startMid = midRef.current;
+          const aD = Math.max(50, availRef.current);
+          const after100 = Math.max(0, qty - 100);
+          const x = after100 / 900; // 0..1
+          const curve = Math.pow(x, IMPACT_CURVE_POW);
+          const liquidityFactor = Math.pow(BASE_DEPTH / aD, LIQ_POWER);
+          const impactMag = (IMPACT_MIN + (IMPACT_MAX - IMPACT_MIN) * curve) * liquidityFactor;
+          const impact = sgn * impactMag;
+          const endMid = Math.max(1, startMid + impact);
+
+          // --- VWAP slippage across the path ---
+          const vwap =
+            side==="BUY"
+              ? (startMid + spread/2) + 0.5 * (endMid - startMid)
+              : (startMid - spread/2) + 0.5 * (endMid - startMid);
+
+          // cash/pos using VWAP with short reserve rules:
+          const notional = qty * vwap;
+          const fee = notional * 0.0001;
+
+          if (side==="BUY") {
+            // Buying to open/increase long OR to cover a short: cash outflow
+            setCash(c=>c - fee); // fee always from cash
+            if (posRef.current < 0) {
+              // covering: take from reserve first
+              setReserve(r => {
+                const r2 = r - notional;
+                if (r2 >= 0) return r2;
+                setCash(c => c + r2); // r2 < 0 => reduce cash by remainder
+                return 0;
+              });
+            } else {
+              // normal long open/increase
+              setCash(c=>c - notional);
+            }
+            setPos(p=>p + qty);
+          } else {
+            // SELL: closing long adds cash; opening/increasing short → proceeds to reserve (not cash)
+            setCash(c=>c - fee); // fee from cash
+            if (posRef.current > 0) {
+              setCash(c=>c + notional); // reduce/close long → cash in
+            } else {
+              setReserve(r=>r + notional); // open/increase short → proceeds to reserve
+            }
+            setPos(p=>p - qty);
+          }
+
+          // if we just fully closed a short (pos crosses to >= 0), sweep any leftover reserve to cash
+          setTimeout(() => {
+            if (posRef.current >= 0 && reserveRef.current > 0) {
+              setCash(c => c + reserveRef.current);
+              setReserve(0);
+            }
+          }, 0);
+
+          // sounds + haptics
+          if (soundOn) {
+            if (side === "BUY")  { chirp(420, 880, 0.18, "sine", 0.03); }
+            if (side === "SELL") { chirp(880, 420, 0.18, "sine", 0.03); }
+          }
+          if (navigator.vibrate) navigator.vibrate(15);
+
+          // set mid to endMid (price after you pushed it)
+          setMid(endMid);
+          setTick(t => { const t2=t+1; setHist(h=>[...h, {t:t2, mid:endMid}].slice(-700)); return t2; });
+
+          // consume liquidity this tick
+          setAvail(a => clamp(a - qty, 50, BASE_DEPTH));
+
+          // kick in faster reversion after large orders
+          triggerRevertBoost(qty);
+        }
+
+        // ---------- UI ----------
+        const totalVal = cashRef.current + reserveRef.current + posRef.current * midRef.current;
+        window.__fairForChart = fairRef.current; // for chart dashed line
+
+        // News banner style: colored in Easy; neutral in Normal
+        function NewsBanner() {
+          if (!headline) return null;
+          const colored = (mode === "easy");
+          const klass = colored
+            ? (headline.pct>0?"bg-emerald-50 border-emerald-300":(headline.pct<0?"bg-rose-50 border-rose-300":"bg-slate-50 border-slate-300"))
+            : "bg-white border-slate-200";
+          const rows = [
+            React.createElement("div", { key:"n1", className:"text-sm font-semibold" },
+              (colored
+                ? (headline.pct>0 ? "▲ Positive macro" : headline.pct<0 ? "▼ Negative macro" : "→ Neutral macro")
+                : "News")
+            ),
+            React.createElement("div", { key:"n2", className:"text-sm" }, headline.h),
+            React.createElement("div", { key:"n3", className:"text-xs text-gray-700 mt-1" },
+              `${headline.why}${headline.pct===0 ? "" : ` — fair value adjusted by ${(headline.pct*100).toFixed(0)}%.`}`
+            )
+          ];
+          return React.createElement("div", { className:`p-3 rounded-2xl border shadow-sm ${klass}` }, rows);
+        }
+
+        const TopStats = React.createElement("div", { className:"grid md:grid-cols-6 gap-3" }, [
+          React.createElement("div", { key:"s1", className:"p-3 rounded-2xl border shadow-sm bg-white" },
+            React.createElement("div", { className:"text-xs text-gray-500" }, "Mid"),
+            React.createElement("div", { className:"text-2xl font-semibold" }, "$"+fmt2(midRef.current)),
+            React.createElement("div", { className:"text-xs text-gray-500 mt-1" }, "Spread "+fmt2(spread))
+          ),
+          React.createElement("div", { key:"s2", className:"p-3 rounded-2xl border shadow-sm bg-white" },
+            React.createElement("div", { className:"text-xs text-gray-500" }, "Fair Value"),
+            React.createElement("div", { className:"text-2xl font-semibold" }, "$"+fmt2(fairRef.current)),
+            React.createElement("div", { className:"text-xs text-gray-500 mt-1" }, "Anchors drift")
+          ),
+          React.createElement("div", { key:"s3", className:"p-3 rounded-2xl border shadow-sm bg-white" },
+            React.createElement("div", { className:"text-xs text-gray-500" }, "Position"),
+            React.createElement("div", { className:"text-2xl font-semibold" }, `${posRef.current} sh`),
+            React.createElement("div", { className:"text-xs text-gray-500 mt-1" }, "Cap ±"+MAX_POS)
+          ),
+          React.createElement("div", { key:"s4", className:"p-3 rounded-2xl border shadow-sm bg-white" },
+            React.createElement("div", { className:"text-xs text-gray-500" }, "Cash"),
+            React.createElement("div", { className:"text-2xl font-semibold" }, "$"+cashRef.current.toLocaleString())
+          ),
+          React.createElement("div", { key:"s5", className:"p-3 rounded-2xl border shadow-sm bg-white" },
+            React.createElement("div", { className:"text-xs text-gray-500" }, "P&L (MTM)"),
+            React.createElement("div", { className:"text-2xl font-semibold "+(pnl>0?"text-green-600":(pnl<0?"text-rose-600":"text-gray-900")) }, "$"+fmt2(pnl)),
+            React.createElement("div", { className:"text-xs text-gray-500 mt-1" }, "Total $"+totalVal.toLocaleString())
+          ),
+          React.createElement("div", { key:"s6", className:"p-3 rounded-2xl border shadow-sm bg-white flex items-center justify-center gap-2" },
+            React.createElement("button", {
+              onClick: enableSound,
+              className: "px-3 py-2 rounded-xl border shadow-sm text-sm transition hover:bg-slate-50 active:scale-[0.98]"
+            }, (soundOn ? "🔊 Sound on" : "🔇 Enable sound")),
+            React.createElement("button", {
+              onClick: toggleFullscreen,
+              className: "px-3 py-2 rounded-xl border shadow-sm text-sm transition hover:bg-slate-50 active:scale-[0.98]"
+            }, document.fullscreenElement ? "⤢ Exit Fullscreen" : "⤢ Fullscreen")
+          )
+        ]);
+
+        if (screen==="welcome"){
+          const lb = loadLB();
+          const leader = (lb.length===0
+            ? React.createElement("div", { className:"text-sm text-gray-500" }, "No scores yet — be the first!")
+            : React.createElement("ol", { className:"text-sm space-y-1" },
+                lb.slice(0,10).map((r,i)=>
+                  React.createElement("li", { key:i, className:"flex justify-between" },
+                    React.createElement("span", null, `${i+1}. ${r.name}`),
+                    React.createElement("span", { className:r.pnl>0?"text-green-600":(r.pnl<0?"text-rose-600":"") }, `$${fmt2(r.pnl)}`)
+                  )
+                )
+              )
+          );
+
+          const modeBox = React.createElement("div", { className:"grid md:grid-cols-2 gap-3" }, [
+            React.createElement("label", { key:"m1", className:"p-3 rounded-2xl border shadow-sm bg-white flex gap-3 cursor-pointer" },
+              React.createElement("input", { type:"radio", name:"mode", className:"mt-1", checked: mode==="easy", onChange:()=>setMode("easy") }),
+              React.createElement("div", null,
+                React.createElement("div", { className:"font-semibold" }, "Easy"),
+                React.createElement("div", { className:"text-sm text-gray-600" }, "Colored news cues, auto-pause 5s on headlines, ~20% slower ticks (~8Hz). No leaderboard.")
+              )
+            ),
+            React.createElement("label", { key:"m2", className:"p-3 rounded-2xl border shadow-sm bg-white flex gap-3 cursor-pointer" },
+              React.createElement("input", { type:"radio", name:"mode", className:"mt-1", checked: mode==="normal", onChange:()=>setMode("normal") }),
+              React.createElement("div", null,
+                React.createElement("div", { className:"font-semibold" }, "Normal"),
+                React.createElement("div", { className:"text-sm text-gray-600" }, "No color assists, no pauses, full-speed ticks (~10Hz). Leaderboard enabled.")
+              )
+            )
+          ]);
+
+          const kioskBtn = React.createElement("button", {
+              onClick: toggleFullscreen,
+              className:"px-3 py-2 rounded-xl border shadow-sm text-sm transition hover:bg-slate-50 active:scale-[0.98]"
+            }, document.fullscreenElement ? "⤢ Exit Fullscreen" : "⤢ Fullscreen (Kiosk)");
+
+          return React.createElement("div", { className:"max-w-5xl mx-auto p-4 space-y-6" }, [
+            React.createElement("h1", { key:"w0", className:"text-3xl font-bold" }, "Freshers Fair — Liquidity Trading Game"),
+            React.createElement("div", { key:"wX", className:"text-sm text-gray-700 p-3 rounded-2xl border bg-white shadow-sm" },
+              "Pick a mode: ",
+              React.createElement("b", null, "Easy"),
+              " gives colored news cues, auto-pauses for 5s on headlines, and runs slower so beginners can think. ",
+              React.createElement("b", null, "Normal"),
+              " removes assists and pauses, runs full-speed, and feeds the leaderboard."
+            ),
+            modeBox,
+            React.createElement("div", { key:"w1", className:"p-4 rounded-2xl border shadow-sm bg-white grid md:grid-cols-3 gap-3 items-end" }, [
+              React.createElement("div", { key:"w1a" },
+                React.createElement("label", { className:"text-xs text-gray-500" }, "Your name"),
+                React.createElement("input", { value:player, onChange:e=>setPlayer(e.target.value),
+                  className:"w-full border rounded-xl px-3 py-2 mt-1", placeholder:"e.g., Alex" })
+              ),
+              React.createElement("div", { key:"w1b" },
+                React.createElement("label", { className:"text-xs text-gray-500" }, "Round duration (seconds — news every 15s)"),
+                React.createElement("input", { type:"number", min:60, step:15, value:duration,
+                  onChange:e=>setDuration(clamp(Number(e.target.value)||90, 60, 600)),
+                  className:"w-full border rounded-xl px-3 py-2 mt-1" })
+              ),
+              React.createElement("div", { key:"w1c", className:"flex gap-2" },
+                React.createElement("button", { onClick:start,
+                  className:"px-4 py-3 rounded-xl border shadow-sm font-semibold transition hover:bg-emerald-50 active:scale-[0.98]" }, "Start Round"),
+                React.createElement("button", { onClick: enableSound,
+                  className:"px-4 py-3 rounded-xl border shadow-sm text-sm transition hover:bg-slate-50 active:scale-[0.98]" },
+                  soundOn ? "🔊 Sound on" : "🔇 Enable sound"),
+                kioskBtn
+              )
+            ]),
+            React.createElement("div", { key:"w2", className:"p-4 rounded-2xl border shadow-sm bg-white" }, [
+              React.createElement("div", { key:"w2a", className:"text-sm font-semibold mb-2" }, "Leaderboard (Normal mode) — Top 10"),
+              leader,
+              React.createElement("div", { key:"w2d", className:"mt-3" },
+                React.createElement("button", {
+                  onClick:()=>{ if(confirm("Clear leaderboard?")){ saveLB([]); location.reload(); } },
+                  className:"px-3 py-2 rounded-xl border text-xs hover:bg-slate-50"
+                }, "Clear Leaderboard")
+              )
+            ]),
+            React.createElement("p", { key:"w3", className:"text-xs text-gray-500" },
+              "Index proxy: think S&P 500 / FTSE 100 (broad macro sensitivity).")
+          ]);
+        }
+
+        if (screen==="play"){
+          const headerRight = React.createElement("div", { className:"flex items-center gap-2" }, [
+            React.createElement("span", { key:"rg", className:"px-2 py-1 rounded-full text-xs border bg-white" }, regime),
+            React.createElement("span", { key:"tm", className:"px-2 py-1 rounded-full text-xs border bg-white" }, `⏱ ${timeLeft}s`),
+            React.createElement("span", { key:"tk", className:"px-2 py-1 rounded-full text-xs border bg-white" }, (mode==="easy"?"Easy":"Normal")+" · "+TICKER),
+            React.createElement("button", {
+              key:"sd", onClick: enableSound,
+              className: "px-2 py-1 rounded-full text-xs border bg-white"
+            }, soundOn ? "🔊" : "🔇"),
+            React.createElement("button", {
+              key:"fs", onClick: async()=>{ await toggleFullscreen(); },
+              className: "px-2 py-1 rounded-full text-xs border bg-white"
+            }, document.fullscreenElement ? "⤢" : "⤢")
+          ]);
+
+          const tradePanel = React.createElement("div", { className:"p-4 rounded-2xl border shadow-sm bg-white space-y-3" }, [
+            React.createElement("div", { key:"t0", className:"text-sm font-semibold" }, "Trade"),
+            React.createElement("label", { key:"t1", className:"text-xs text-gray-500" }, "Order size (shares)"),
+            React.createElement("input", { key:"t2", type:"number", min:1, step:1, value:size,
+              onChange:e=>setSize(clamp(Number(e.target.value)||0, 1, 1000000)),
+              className:"w-full border rounded-xl px-3 py-2" }),
+            React.createElement("div", { key:"t3", className:"grid grid-cols-2 gap-2" }, [
+              React.createElement("button", { key:"sell", onClick:()=>trade("SELL"),
+                className:"px-3 py-2 rounded-xl border shadow-sm font-medium transition hover:bg-rose-50 active:scale-[0.98]" }, "SELL"),
+              React.createElement("button", { key:"buy", onClick:()=>trade("BUY"),
+                className:"px-3 py-2 rounded-xl border shadow-sm font-medium transition hover:bg-emerald-50 active:scale-[0.98]" }, "BUY")
+            ]),
+            React.createElement("div", { key:"t4", className:"flex justify-between text-xs text-gray-500" },
+              React.createElement("div", null, "Fee: 0.01% notional"),
+              React.createElement("div", null, `Pos cap: ±${MAX_POS} sh · Liquidity refills each tick`)
+            )
+          ]);
+
+          return React.createElement("div", { className:"max-w-5xl mx-auto p-4 space-y-4" }, [
+            React.createElement("header", { key:"p0", className:"flex items-center justify-between" },
+              [ React.createElement("div", { key:"p0a", className:"text-xl font-semibold" }, `Trader: ${player}`), headerRight ]
+            ),
+            React.createElement(NewsBanner, { key:"nb" }),
+            TopStats,
+            notice && React.createElement("div", { key:"nt", className:"text-xs text-rose-700" }, notice),
+            React.createElement(PriceChart, { key:"ch", data: hist, title: TICKER, fairLine: fairRef.current }),
+            React.createElement("div", { key:"ctl", className:"grid md:grid-cols-3 gap-3 items-end" }, [
+              tradePanel,
+              React.createElement("div", { key:"ct2", className:"p-4 rounded-2xl border shadow-sm bg-white space-y-3" }, [
+                React.createElement("div", { className:"text-sm font-semibold" }, "Round Controls"),
+                React.createElement("button", {
+                  onClick:()=>{ if(confirm("End round now?")){ endTimeRef.current = Date.now(); } },
+                  className:"px-3 py-2 rounded-xl border shadow-sm font-medium transition hover:bg-slate-50 active:scale-[0.98]"
+                }, "End Round"),
+                React.createElement("div", { className:"text-xs text-gray-500" }, mode==="easy"
+                  ? "Easy: colored news, 5s pause on headlines, slower ticks."
+                  : "Normal: no assists, full speed, leaderboard.")
+              ]),
+              React.createElement("div", { key:"ct3", className:"p-4 rounded-2xl border shadow-sm bg-white space-y-2" }, [
+                React.createElement("div", { className:"text-sm font-semibold" }, "How to win"),
+                React.createElement("ul", { className:"list-disc list-inside text-sm text-gray-700 space-y-1" }, [
+                  React.createElement("li", { key:"h1" }, "Watch Fair Value moves on news."),
+                  React.createElement("li", { key:"h2" }, "Slice orders across ticks to reduce impact."),
+                  React.createElement("li", { key:"h3" }, "Keep an eye on the position cap.")
+                ])
+              ])
+            ])
+          ]);
+        }
+
+        // --- end screen ---
+        const lb = loadLB();
+        const finalTotalText = (cashRef.current + reserveRef.current + posRef.current*midRef.current).toLocaleString();
+        return React.createElement("div", { className:"max-w-5xl mx-auto p-4 space-y-6" }, [
+          React.createElement("h2", { key:"e0", className:"text-2xl font-bold" }, "Round complete"),
+          React.createElement("div", { key:"e1", className:"grid md:grid-cols-3 gap-3" }, [
+            React.createElement("div", { key:"e1a", className:"p-3 rounded-2xl border shadow-sm bg-white" },
+              React.createElement("div", { className:"text-xs text-gray-500" }, "Trader"),
+              React.createElement("div", { className:"text-2xl font-semibold" }, player)
+            ),
+            React.createElement("div", { key:"e1b", className:"p-3 rounded-2xl border shadow-sm bg-white" },
+              React.createElement("div", { className:"text-xs text-gray-500" }, "Mode"),
+              React.createElement("div", { className:"text-2xl font-semibold" }, mode==="easy"?"Easy":"Normal")
+            ),
+            React.createElement("div", { key:"e1c", className:"p-3 rounded-2xl border shadow-sm bg-white" },
+              React.createElement("div", { className:"text-xs text-gray-500" }, "Total Value"),
+              React.createElement("div", { className:"text-2xl font-semibold" }, "$"+finalTotalText)
+            )
+          ]),
+          (mode==="normal"
+            ? React.createElement("div", { key:"e2", className:"p-4 rounded-2xl border shadow-sm bg-white" }, [
+                React.createElement("div", { className:"text-sm font-semibold mb-2" }, "Leaderboard (Normal mode) — Top 10"),
+                (lb.length===0
+                  ? React.createElement("div", { className:"text-sm text-gray-500" }, "No scores yet — be the first!")
+                  : React.createElement("ol", { className:"text-sm space-y-1" },
+                      lb.slice(0,10).map((r,i)=>
+                        React.createElement("li", { key:i, className:"flex justify-between" },
+                          React.createElement("span", null, `${i+1}. ${r.name}`),
+                          React.createElement("span", { className:r.pnl>0?"text-green-600":(r.pnl<0?"text-rose-600":"") }, `$${fmt2(r.pnl)}`)
+                        )
+                      )
+                    )
+                )
+              ])
+            : React.createElement("div", { key:"e2b", className:"p-4 rounded-2xl border shadow-sm bg-white text-sm text-gray-600" },
+                "Easy mode results are not recorded in the leaderboard. Try Normal mode to compete!")),
+          React.createElement("div", { key:"e3", className:"mt-3 flex gap-2" }, [
+            React.createElement("button", {
+              onClick:()=>setScreen("welcome"),
+              className:"px-3 py-2 rounded-xl border shadow-sm font-medium transition hover:bg-slate-50 active:scale-[0.98]"
+            }, "Back to Start"),
+            React.createElement("button", {
+              onClick:()=>{ setScreen("play"); /* restart */ 
+                // re-run start() logic inline to preserve mode
+                setMid(100); setFair(100); setCash(100000); setReserve(0); setPos(0);
+                setTick(0); setHist([{t:0, mid:100}]); setRegime("Calm"); setHeadline(null); setNotice("");
+                setAvail(1000); setRevertTicks(0); setRevertStrength(0); pauseUntilRef.current = 0;
+                const now = Date.now(); startTimeRef.current=now; endTimeRef.current=now+duration*1000;
+                scheduleRef.current=[15,30,45,60,75].map(s=>now+s*1000); nextNewsIdxRef.current=0;
+              },
+              className:"px-3 py-2 rounded-xl border shadow-sm font-medium transition hover:bg-emerald-50 active:scale-[0.98]"
+            }, "Play Again")
+          ])
+        ]);
+      }
+
+      const root = ReactDOM.createRoot(document.getElementById("root"));
+      root.render(React.createElement(Game));
+    </script>
+  </body>
+</html>
