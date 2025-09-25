@@ -1,30 +1,31 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
   <head>
-    <meta charset="utf-8" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Freshers Fair — Liquidity Trading Game</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <!-- Tailwind + React UMD -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 
-    <link rel="stylesheet" href="style.css" />
-  </head>
-  <body class="bg-slate-50">
-    <!-- Logo -->
-    <div class="p-2">
-      <img src="assets/Kent_Invest_Logo.png" alt="Kent Invest Logo" class="h-14 md:h-20" />
-    </div>
-
-    <!-- React will render into here -->
-    <div id="root"></div>
-
-    <!-- (Optional) sanity log -->
+    <!-- Sanity check -->
     <script>console.log("index.html loaded");</script>
 
-    <!-- Your app code (AFTER React) -->
-    <script src="./main.js?v=20240925a"></script>
+    <style>
+      body {
+        background-color: #f9fafb; /* subtle gray */
+        font-family: system-ui, sans-serif;
+      }
+    </style>
+  </head>
+  <body class="min-h-screen flex flex-col">
+    <!-- Root container for React -->
+    <div id="root" class="flex-1"></div>
+
+    <!-- Chart code must come before main.js -->
+    <script src="./chart.js?v=20240925c"></script>
+    <script src="./main.js?v=20240925c"></script>
   </body>
 </html>
