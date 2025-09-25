@@ -1,6 +1,5 @@
-function updateMarket(state) {
-  state.price += (Math.random() - 0.5); // small random move
+// market.js — placeholder updater (expand later)
+window.updateMarket = function updateMarket(state) {
+  state.price += (Math.random() - 0.5) * 0.2;
   state.tick++;
-}
-
-window.updateMarket = updateMarket;
+};
