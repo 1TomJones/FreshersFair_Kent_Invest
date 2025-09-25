@@ -15,13 +15,10 @@
   }) {
     if (!data || data.length === 0) return h("div", { style: { height: "200px" } });
 
-    // Mobile-focused sizing/whitespace
-    // Goal: reduce internal padding, remove letterboxing, slightly taller on mobile
-    const heightVh = mobile ? 54 : 36; // adjust if you want even taller: 56–58
-    const cssH = heightVh + "vh";
+    // Base drawing space
     const w = 1800, hgt = 560;
 
-    // Zero internal padding on mobile
+    // On mobile: zero internal padding and tiny value-padding
     const BLEED = mobile ? 0 : 10;
     const yPadPct = mobile ? 0.001 : 0.02;
 
@@ -91,13 +88,19 @@
       elems.push(h("text", { key: "nt" + idx, x: x, y: bubbleY + 5, "text-anchor": "middle", className: "fill-gray-900 text-[14px] font-bold" }, "N"));
     });
 
-    // On mobile, remove letterboxing by forcing fill
-    const par = mobile ? "none" : "none";
+    // IMPORTANT: avoid distortion on mobile.
+    // We let CSS control the height via aspect-ratio and max-height,
+    // and keep the SVG's natural aspect using 'meet'.
+    const svgStyle = mobile
+      ? { width: "100%", height: "auto", display: "block", aspectRatio: `${w}/${hgt}`, maxHeight: "50vh" } // shorter than before
+      : { width: "100%", height: "36vh", display: "block" };
+
+    const par = "xMidYMid meet";
 
     return h(
       "div",
       { className: mobile ? "bg-transparent" : "p-3 rounded-2xl border shadow-sm bg-white" },
-      h("svg", { viewBox: `0 0 ${w} ${hgt}`, style: { width: "100%", height: cssH, display: "block" }, preserveAspectRatio: par }, elems)
+      h("svg", { viewBox: `0 0 ${w} ${hgt}`, style: svgStyle, preserveAspectRatio: par }, elems)
     );
   }
 
