@@ -1,5 +1,4 @@
-function placeOrder(size) {
-  console.log("Placing order:", size);
-}
-
-window.placeOrder = placeOrder;
+// trading.js — placeholder trading function (expand later)
+window.placeOrder = function placeOrder(qty) {
+  console.log("Placing order:", qty);
+};
