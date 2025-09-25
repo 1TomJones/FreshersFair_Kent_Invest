@@ -1,39 +1,39 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
   <head>
-    <meta charset="utf-8" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Freshers Fair — Liquidity Trading Game</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Tailwind for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- React + ReactDOM UMD -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+    <!-- Sanity check -->
+    <script>console.log("index.html loaded");</script>
+
     <style>
-      /* full-bleed helper for the chart on desktop */
-      .full-bleed {
-        position: relative;
-        left: 50%;
-        right: 50%;
-        margin-left: -50vw;
-        margin-right: -50vw;
-        width: 100vw;
+      body {
+        background-color: #f9fafb; /* subtle background */
+        font-family: system-ui, sans-serif;
       }
     </style>
   </head>
-  <body class="bg-slate-50">
-    <!-- Fixed logo overlay (bigger + 50% transparent) -->
-    <div class="fixed top-2 left-2 z-50">
-      <img src="assets/Kent_Invest_Logo.png" alt="Kent Invest" style="height:84px; opacity:0.5" />
-    </div>
+  <body class="min-h-screen flex flex-col">
+    <!-- React mounts here -->
+    <div id="root" class="flex-1"></div>
 
-    <div id="root"></div>
-
-    <!-- App modules (order matters) -->
-    <script src="./state.js?v=20240926a"></script>
-    <script src="./market.js?v=20240926a"></script>
-    <script src="./trading.js?v=20240926a"></script>
-    <script src="./chart.js?v=20240926a"></script>
-    <script src="./ui-mobile.js?v=20240926a"></script>
-    <script src="./ui-desktop.js?v=20240926a"></script>
-    <script src="./main.js?v=20240926a"></script>
+    <!-- Load scripts in correct order -->
+    <script src="./chart.js"></script>
+    <script src="./state.js"></script>
+    <script src="./market.js"></script>
+    <script src="./trading.js"></script>
+    <script src="./ui-desktop.js"></script>
+    <script src="./ui-mobile.js"></script>
+    <script src="./app.js"></script>   <!-- NEW: assembles the app -->
+    <script src="./main.js"></script>  <!-- Bootstraps React -->
   </body>
 </html>
