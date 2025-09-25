@@ -1,16 +1,13 @@
 /* main.js — Freshers Fair Liquidity Trading Game
-   Requires:
-   - React 18 UMD (index.html)
-   - chart.js (defines window.PriceChart)
+   Requires React UMD + chart.js
 */
 
 const { useState, useEffect, useRef } = React;
 const h = React.createElement;
 
-// ---------- Config / Utils ----------
 const TICKER = "SPX";
 const MAX_POS = 1000;
-const LB_KEY = "liquidity_fair_leaderboard_v15";
+const LB_KEY = "liquidity_fair_leaderboard_v15b";
 
 const fmt2 = n => Number(n).toFixed(2);
 const clamp = (x,a,b) => Math.max(a, Math.min(b, x));
@@ -19,7 +16,7 @@ const isMobileNow = () => (typeof window!=="undefined" && window.innerWidth <= 6
 const loadLB = () => { try { return JSON.parse(localStorage.getItem(LB_KEY)) || []; } catch { return []; } };
 const saveLB = (arr) => localStorage.setItem(LB_KEY, JSON.stringify(arr));
 
-// ---------- Audio ----------
+// Audio
 const AudioCtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx;
 function ensureAudio(){ if(!audioCtx){ try{ audioCtx=new AudioCtx(); }catch(e){} } }
@@ -28,11 +25,11 @@ function beep(f=520,d=0.12,v=0.03){ if(!audioCtx) return; const t=audioCtx.curre
 function chirp(a=420,b=880,d=0.18,v=0.03){ if(!audioCtx)return; const t=audioCtx.currentTime,o=audioCtx.createOscillator(),g=audioCtx.createGain(); o.type="sine"; o.frequency.setValueAtTime(a,t); o.frequency.linearRampToValueAtTime(b,t+d); _envGain(g,t,d,v); o.connect(g).connect(audioCtx.destination); o.start(t); o.stop(t+d);}
 function chord(freqs=[523.25,659.25,783.99],d=0.6,v=0.025){ if(!audioCtx)return; const t=audioCtx.currentTime,bus=audioCtx.createGain(); bus.gain.setValueAtTime(v,t); bus.connect(audioCtx.destination); freqs.forEach(f=>{const o=audioCtx.createOscillator(),g=audioCtx.createGain(); o.type="sine"; o.frequency.value=f; _envGain(g,t,d,1); o.connect(g).connect(bus); o.start(t); o.stop(t+d);});}
 
-// ---------- Fullscreen ----------
+// Fullscreen
 async function enterFullscreen(){ const el=document.documentElement; if(el.requestFullscreen) return el.requestFullscreen(); if(el.webkitRequestFullscreen) return el.webkitRequestFullscreen(); }
 async function exitFullscreen(){ if(document.exitFullscreen) return document.exitFullscreen(); if(document.webkitExitFullscreen) return document.webkitExitFullscreen(); }
 
-// ---------- News ----------
+// News
 const NEWS = [
   { h:"BoE cuts rates 50bps",            why:"Cheaper borrowing supports equities",              pct:+0.10 },
   { h:"BoE hikes rates 50bps",           why:"Higher rates weigh on valuations",                 pct:-0.10 },
@@ -48,7 +45,6 @@ const NEWS = [
 ];
 const pickNews = () => NEWS[Math.floor(Math.random()*NEWS.length)];
 
-// ---------- News strip (mobile has smaller min-height) ----------
 function NewsStrip({ headline, mode }){
   const colored = mode==="easy";
   const isMob = isMobileNow();
@@ -66,19 +62,16 @@ function NewsStrip({ headline, mode }){
   ]);
 }
 
-// ---------- Game ----------
 function Game(){
   const [isMobile,setIsMobile] = useState(isMobileNow());
   useEffect(()=>{ const onR=()=>setIsMobile(isMobileNow()); window.addEventListener("resize",onR); return ()=>window.removeEventListener("resize",onR); },[]);
 
-  // screens & mode
   const [screen,setScreen]=useState("welcome");
   const [mode,setMode]=useState("normal");
   const [player,setPlayer]=useState(localStorage.getItem("player_name")||"");
   const [timeLeft,setTimeLeft]=useState(120);
   const [soundOn,setSoundOn]=useState(localStorage.getItem("sound_on")==="1");
 
-  // state
   const [mid,_setMid]=useState(100);
   const [fair,_setFair]=useState(100);
   const [spread]=useState(0.10);
@@ -103,7 +96,6 @@ function Game(){
   const [revertTicks,_setRevertTicks]=useState(0);
   const [revertStrength,_setRevertStrength]=useState(0);
 
-  // refs
   const midRef=useRef(100), fairRef=useRef(100), cashRef=useRef(100000), posRef=useRef(0), availRef=useRef(BASE_DEPTH);
   const reserveRef=useRef(0);
   const avgPriceRef=useRef(null);
@@ -111,10 +103,9 @@ function Game(){
   const scheduleRef=useRef([]), nextNewsIdxRef=useRef(0);
   const revertTicksRef=useRef(0), revertStrengthRef=useRef(0);
   const tickRef=useRef(0);
-  const newsEventsRef=useRef([]); // {i}
-  const tradesRef=useRef([]);     // {i,price,side}
+  const newsEventsRef=useRef([]); // now stores { t }
+  const tradesRef=useRef([]);     // now stores { t, price, side }
 
-  // setters that sync refs
   const setMid=v=>{ const x=typeof v==="function"?v(midRef.current):v; midRef.current=x; _setMid(x); };
   const setFair=v=>{ const x=typeof v==="function"?v(fairRef.current):v; fairRef.current=x; _setFair(x); };
   const setCash=v=>{ const x=typeof v==="function"?v(cashRef.current):v; cashRef.current=x; _setCash(x); };
@@ -128,20 +119,18 @@ function Game(){
   const pnl = total - 100000;
   const pnlClass = pnl>0?"text-green-600":(pnl<0?"text-rose-600":"text-gray-900");
 
-  function enableSound(){ try{ ensureAudio(); audioCtx && audioCtx.resume(); setSoundOn(true); localStorage.setItem("sound_on","1"); }catch{} }
+  function enableSound(){ try{ if(!audioCtx) ensureAudio(); audioCtx && audioCtx.resume(); setSoundOn(true); localStorage.setItem("sound_on","1"); }catch{} }
 
-  // drift toward fair + revert boost
   function driftTowardFair(){
     const d=fairRef.current - midRef.current;
-    const baseFactor=clamp(Math.abs(d)/10,0,1);
+    const baseFactor=Math.max(0, Math.min(1, Math.abs(d)/10));
     const BETA_PER_SEC=0.35; const betaTick=BETA_PER_SEC/10;
     let drift = betaTick*d*baseFactor;
     if(revertTicksRef.current>0){
       drift += revertStrengthRef.current*Math.sign(d)*Math.min(1,Math.abs(d)/0.5);
-      setRevertTicks(t=>t-1);
-      setRevertStrength(s=>s*0.6);
+      setRevertTicks(t=>t-1); setRevertStrength(s=>s*0.6);
     }
-    return clamp(drift,-0.12,+0.12);
+    return Math.max(-0.12, Math.min(0.12, drift));
   }
   function triggerRevertBoost(qty){
     if(qty>=500){
@@ -180,7 +169,6 @@ function Game(){
     for(let i=nextNewsIdxRef.current;i<scheduleRef.current.length;i++) scheduleRef.current[i]+=ms;
   }
 
-  // loop
   useEffect(()=>{
     if(screen!=="play") return;
     if(loopRef.current) clearInterval(loopRef.current);
@@ -197,7 +185,6 @@ function Game(){
       const left=Math.max(0, Math.ceil((endTimeRef.current - now)/1000));
       setTimeLeft(left);
 
-      // shocks
       const sigmaAbs=fairRef.current*(regime==="Calm"?SIGMA_CALM:SIGMA_VOL);
       let randomShock=(Math.random()*2-1)*sigmaAbs;
       if(Math.random()<JUMP_P){
@@ -212,16 +199,15 @@ function Game(){
         return nm;
       });
 
-      // refill
-      const repl=BASE_DEPTH*(REPL_PER_SEC*(intervalMs/1000)); setAvail(a=>clamp(a+repl,50,BASE_DEPTH));
+      const repl=BASE_DEPTH*(REPL_PER_SEC*(intervalMs/1000)); setAvail(a=>Math.max(50, Math.min(BASE_DEPTH, a+repl)));
       if(Math.random()<0.03) setRegime(r=>r==="Calm"?"Volatile":"Calm");
 
-      // news schedule
       const idx=nextNewsIdxRef.current;
       if(idx<scheduleRef.current.length && now>=scheduleRef.current[idx]){
         const n=pickNews(); setHeadline(n);
         if(soundOn){ if(n.pct>0) beep(740,0.18,0.03); else if(n.pct<0) beep(330,0.18,0.03); else beep(520,0.12,0.02); }
-        newsEventsRef.current.push({ i: Math.max(0, hist.length-1) });
+        // RECORD ABSOLUTE TICK for scrolling markers
+        newsEventsRef.current.push({ t: tickRef.current });
         if(n.pct!==0) setFair(f=>Math.max(1, f*(1+n.pct)));
         nextNewsIdxRef.current = idx+1;
         if(mode==="easy") pauseFor(5000);
@@ -243,7 +229,6 @@ function Game(){
     return ()=>{ if(loopRef.current){ clearInterval(loopRef.current); loopRef.current=null; } };
   },[screen,mode,regime,soundOn]);
 
-  // vwap fix
   function updateAvgPriceAfterTrade(pOld, side, qty, vwap){
     const pNew = side==="BUY" ? pOld + qty : pOld - qty;
     if(pOld===0){ avgPriceRef.current=vwap; }
@@ -262,7 +247,7 @@ function Game(){
     if(screen!=="play") return;
     const reqQty=Math.max(1,Math.round(size)); const sgn=side==="BUY"?+1:-1;
     const maxAdd = (sgn>0) ? MAX_POS - posRef.current : MAX_POS + posRef.current;
-    const qty=clamp(reqQty,0,Math.max(0,maxAdd));
+    const qty=Math.max(0, Math.min(maxAdd, reqQty));
     if(qty===0){ setNotice(`Position limit reached (±${MAX_POS} sh).`); setTimeout(()=>setNotice(""),1200); return; }
 
     const startMid=midRef.current;
@@ -283,27 +268,29 @@ function Game(){
     const pOld=posRef.current; updateAvgPriceAfterTrade(pOld,side,qty,vwap);
 
     if(side==="BUY"){
-      setCash(c=>c - fee);
-      if(pOld<0){ setReserve(r=>{ const r2=r-notional; if(r2>=0) return r2; setCash(c=>c + r2); return 0; }); }
-      else { setCash(c=>c - notional); }
-      setPos(p=>p + qty);
+      _setCash(c=>c - fee);
+      if(pOld<0){ _setReserve(r=>{ const r2=r-notional; if(r2>=0) return r2; _setCash(c=>c + r2); return 0; }); }
+      else { _setCash(c=>c - notional); }
+      _setPos(p=>p + qty);
     }else{
-      setCash(c=>c - fee);
-      if(pOld>0) setCash(c=>c + notional);
-      else setReserve(r=>r + notional);
-      setPos(p=>p - qty);
+      _setCash(c=>c - fee);
+      if(pOld>0) _setCash(c=>c + notional);
+      else _setReserve(r=>r + notional);
+      _setPos(p=>p - qty);
     }
 
-    setTimeout(()=>{ if(posRef.current>=0 && reserveRef.current>0){ setCash(c=>c + reserveRef.current); setReserve(0);} },0);
+    setTimeout(()=>{ if(posRef.current>=0 && reserveRef.current>0){ _setCash(c=>c + reserveRef.current); _setReserve(0);} },0);
 
     if(soundOn){ side==="BUY" ? chirp(420,880,0.18,0.03) : chirp(880,420,0.18,0.03); }
     if(navigator.vibrate) navigator.vibrate(15);
 
     setMid(endMid);
-    setTick(t=>{ const t2=t+1; setHist(h=>[...h,{t:t2,mid:endMid}].slice(-700)); return t2; });
-    tradesRef.current.push({ i: Math.max(0, hist.length-1), price:endMid, side });
+    setTick(t=>{ const t2=t+1; tickRef.current=t2; setHist(h=>[...h,{t:t2,mid:endMid}].slice(-700)); return t2; });
 
-    setAvail(a=>clamp(a - qty, 50, BASE_DEPTH));
+    // RECORD ABSOLUTE TICK so markers scroll with history
+    tradesRef.current.push({ t: tickRef.current, price: endMid, side });
+
+    setAvail(a=>Math.max(50, Math.min(BASE_DEPTH, a - qty)));
     triggerRevertBoost(qty);
   }
 
@@ -349,7 +336,7 @@ function Game(){
         h("div",null, h("label",{className:"text-xs text-gray-500"},"(Info) News cadence"), h("div",{className:"text-sm text-gray-600 mt-1"},"15s, 30s, … 105s")),
         h("div",{className:"flex gap-2"},
           h("button",{onClick:startRound,className:"px-4 py-3 rounded-xl border shadow-sm font-semibold hover:bg-emerald-50"},"Start Round"),
-          h("button",{onClick:enableSound,className:"px-4 py-3 rounded-xl border shadow-sm text-sm hover:bg-slate-50"}, soundOn?"🔊 On":"🔇 Enable")
+          h("button",{onClick:enableSound,className:"px-4 py-3 rounded-xl border shadow-sm text-sm hover:bg-slate-50"}, soundOn ? "🔊 On" : "🔇 Enable")
         )
       ]),
       h("div",{className:(isMobile?"p-3":"p-4")+" rounded-2xl border shadow-sm bg-white"},[
@@ -371,7 +358,6 @@ function Game(){
     ]);
 
     if(isMobile){
-      // Tighten vertical spacing so everything fits nicely on one screen
       return h("div",{className:"mx-auto w-full px-2 space-y-2"},[
         h("header",{className:"flex items-center justify-between"},
           h("div",{className:"text-base font-bold"},"Liquidity Trading Game"), headerRight
@@ -440,7 +426,7 @@ function Game(){
     ]);
   }
 
-  // end screen
+  // End screen
   const lb=loadLB();
   const finalTotalText=(cashRef.current + reserveRef.current + posRef.current*midRef.current).toLocaleString();
   const wrapper=isMobile ? "mx-auto w-full px-3 space-y-4" : "mx-auto w-full px-8 max-w-[1500px] space-y-6";
