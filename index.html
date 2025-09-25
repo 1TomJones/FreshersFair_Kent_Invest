@@ -15,11 +15,13 @@
     </style>
   </head>
   <body class="min-h-screen flex flex-col">
-    <!-- Fixed logo overlay (visible on every screen) -->
-    <div class="fixed top-2 left-2 z-50">
-      <img src="assets/Kent_Invest_Logo.png" alt="Kent Invest" class="h-12 md:h-16" />
-    </div>
-
+<!-- Fixed logo overlay (visible on every screen) -->
+<div class="fixed top-2 left-2 z-50">
+  <!-- 75% larger than the previous 48px → ~84px, with 50% transparency -->
+  <img src="assets/Kent_Invest_Logo.png"
+       alt="Kent Invest"
+       style="height:84px; opacity:0.5" />
+</div>
     <!-- React root -->
     <div id="root" class="flex-1"></div>
 
@@ -28,3 +30,4 @@
     <script src="./main.js?v=20250925m"></script>
   </body>
 </html>
+
