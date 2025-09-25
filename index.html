@@ -8,7 +8,7 @@
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <style>
-      /* Mobile-first tweaks */
+      /* Mobile-first sizing */
       @media (max-width: 480px) {
         .mobile-pad { padding: 10px !important; }
         .mobile-card { border-radius: 16px !important; }
@@ -22,60 +22,69 @@
   <body class="bg-slate-50">
     <div id="root"></div>
     <script>
-      // === Supabase Leaderboard (your project) ===
+      /* =========================
+         SUPABASE — SHARED LEADERBOARD
+         ========================= */
       const SB_URL = "https://jlakntrrewqblgjsauq.supabase.co";
       const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpsYWtudHJyZXdxYmxnbGpzYXVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg3NDk3NDcsImV4cCI6MjA3NDMyNTc0N30.Is8AkR8rUsqczrZudanVa5N3jmYWFBl4cqY-OybBWsU";
 
       async function loadLBRemote() {
-        try {
-          const res = await fetch(
-            `${SB_URL}/rest/v1/scores?select=name,pnl,total,ts&order=pnl.desc&limit=50`,
-            { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
-          );
-          if (!res.ok) throw new Error("fetch failed");
-          return await res.json();
-        } catch (e) {
-          console.warn("LB fetch error:", e);
-          return [];
-        }
+        const url = `${SB_URL}/rest/v1/scores?select=name,pnl,total,ts&mode=eq.normal&order=pnl.desc&limit=50`;
+        const res = await fetch(url, {
+          headers: {
+            apikey: SB_KEY,
+            Authorization: `Bearer ${SB_KEY}`,
+            Accept: "application/json",
+            "Accept-Profile": "public"    // explicit schema for reads
+          }
+        });
+        if (!res.ok) throw new Error(`LB fetch failed: ${res.status}`);
+        return await res.json();
       }
       async function saveLBRemote(entry) {
-        try {
-          await fetch(`${SB_URL}/rest/v1/scores`, {
-            method: "POST",
-            headers: {
-              apikey: SB_KEY,
-              Authorization: `Bearer ${SB_KEY}`,
-              "Content-Type": "application/json",
-              Prefer: "resolution=merge-duplicates"
-            },
-            body: JSON.stringify({ ...entry, mode: "normal" })
-          });
-        } catch (e) {
-          console.warn("LB save error:", e);
-        }
+        const res = await fetch(`${SB_URL}/rest/v1/scores`, {
+          method: "POST",
+          headers: {
+            apikey: SB_KEY,
+            Authorization: `Bearer ${SB_KEY}`,
+            "Content-Type": "application/json",
+            "Content-Profile": "public",   // explicit schema for writes
+            Prefer: "return=representation" // wait for insert
+          },
+          body: JSON.stringify({ ...entry, mode: "normal" })
+        });
+        if (!res.ok) throw new Error(`LB save failed: ${res.status}`);
+        return await res.json();
       }
 
+      /* =========================
+         GAME
+         ========================= */
       const { useState, useEffect, useRef } = React;
-
       const TICKER = "SPX";
       const fmt2 = n => Number(n).toFixed(2);
       const clamp = (x,a,b) => Math.max(a, Math.min(b, x));
       const MAX_POS = 1000;
 
-      // ====== Audio (Web Audio API) ======
+      // Web Audio (beeps)
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       let audioCtx; try { audioCtx = new AudioCtx(); } catch(e) {}
-
-      function _envGain(g, t0, dur, vol=0.03){ try{ g.gain.setValueAtTime(Math.max(0.0001, vol), t0); g.gain.exponentialRampToValueAtTime(0.0001, t0+dur);}catch{} }
+      function _envGain(g,t0,d,vol=0.03){ try{ g.gain.setValueAtTime(Math.max(0.0001,vol),t0); g.gain.exponentialRampToValueAtTime(0.0001,t0+d);}catch{} }
       function beep(freq=520, dur=0.15){ if(!audioCtx) return; const t=audioCtx.currentTime; const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.type="sine"; o.frequency.value=freq; _envGain(g,t,dur,0.03); o.connect(g).connect(audioCtx.destination); o.start(t); o.stop(t+dur); }
       function chirp(a=420,b=880,d=0.18){ if(!audioCtx) return; const t=audioCtx.currentTime; const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.type="sine"; o.frequency.setValueAtTime(a,t); o.frequency.linearRampToValueAtTime(b,t+d); _envGain(g,t,d,0.03); o.connect(g).connect(audioCtx.destination); o.start(t); o.stop(t+d); }
       function chord(freqs=[523,659,784], d=0.5){ if(!audioCtx) return; const t=audioCtx.currentTime; const bus=audioCtx.createGain(); bus.gain.setValueAtTime(0.02,t); bus.connect(audioCtx.destination); freqs.forEach(f=>{ const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.type="sine"; o.frequency.value=f; _envGain(g,t,d,1); o.connect(g).connect(bus); o.start(t); o.stop(t+d); }); }
 
-      // ---------- SVG line chart (mobile-friendly) ----------
-      function PriceChart({ data, height=220, title=TICKER, fairLine=null }) {
-        if (!data || data.length === 0) return React.createElement("div", { className: "h-[220px]"});
-        const w = 860, h = height, padL = 40, padR = 12, padT = 18, padB = 22;
+      // SVG line chart – mobile fill fix (no padding in wrapper, tighter internal pads)
+      function PriceChart({ data, title=TICKER, fairLine=null, mobile=false }) {
+        if (!data || data.length === 0) return React.createElement("div", { className: mobile ? "h-[260px]" : "h-[260px]"});
+        const h = mobile ? 260 : 260;
+        const w = 860;
+        // tighter padding on mobile so the line fills card visually
+        const padL = mobile ? 28 : 56;
+        const padR = mobile ? 8  : 16;
+        const padT = mobile ? 14 : 26;
+        const padB = mobile ? 20 : 26;
+
         const ys = data.map(d => d.mid);
         let minY = Math.min(...ys), maxY = Math.max(...ys);
         const padPct = 0.03;
@@ -88,10 +97,9 @@
 
         const xOf = i => padL + (i / Math.max(1, n-1)) * (w - padL - padR);
         const yOf = v => h - padB - ((v - minY) / rangeY) * (h - padT - padB);
-
         const pts = data.map((d,i) => `${xOf(i)},${yOf(d.mid)}`).join(" ");
 
-        const ticks = 4;
+        const ticks = mobile ? 3 : 5;
         const yTickElems = [];
         for (let k=0; k<ticks; k++) {
           const t = k/(ticks-1);
@@ -106,7 +114,8 @@
         const svgChildren = [
           React.createElement("line", { key:"ax1", x1: padL, y1: h - padB, x2: w - padR, y2: h - padB, stroke: "#e5e7eb", "stroke-width": 1 }),
           React.createElement("line", { key:"ax2", x1: padL, y1: padT, x2: padL, y2: h - padB, stroke: "#e5e7eb", "stroke-width": 1 }),
-        ].concat(yTickElems);
+          ...yTickElems
+        ];
 
         if (fairLine != null) {
           const yFV = yOf(fairLine);
@@ -116,16 +125,15 @@
         }
 
         svgChildren.push(React.createElement("polyline", { key:"ply", points: pts, fill: "none", stroke: "black", "stroke-width": 2 }));
-        for (let i=0;i<data.length;i++){
-          svgChildren.push(React.createElement("circle",{ key:"c"+i, cx: xOf(i), cy: yOf(data[i].mid), r: 1.8, fill:"black" }));
-        }
+        data.forEach((d,i)=> svgChildren.push(React.createElement("circle",{ key:"c"+i, cx:xOf(i), cy:yOf(d.mid), r: mobile?1.6:2, fill:"black" })));
 
-        return React.createElement("div", { className: "p-2 rounded-2xl border shadow-sm bg-white mobile-card" },
-          React.createElement("svg", { viewBox: `0 0 ${w} ${h}`, className: "w-full h-[220px]" }, svgChildren)
+        // wrapper has NO padding so the svg touches card edges (visually fuller)
+        return React.createElement("div", { className: "rounded-2xl border shadow-sm bg-white mobile-card p-0" },
+          React.createElement("svg", { viewBox: `0 0 ${w} ${h}`, className: mobile ? "w-full h-[260px]" : "w-full h-[260px]" }, svgChildren)
         );
       }
 
-      // ---------- News (macro) ----------
+      // Macro news
       const NEWS = [
         { h:"BoE cuts rates 50bps",            why:"Cheaper borrowing supports equities",              pct:+0.10 },
         { h:"BoE hikes rates 50bps",           why:"Higher rates weigh on valuations",                 pct:-0.10 },
@@ -141,7 +149,7 @@
       ];
       const pickNews = () => NEWS[Math.floor(Math.random()*NEWS.length)];
 
-      // ---------- Fullscreen helpers (desktop) ----------
+      // Fullscreen helpers
       async function enterFullscreen() {
         const el = document.documentElement;
         if (el.requestFullscreen) return el.requestFullscreen();
@@ -164,13 +172,13 @@
         async function toggleFS(){ try{ if(!document.fullscreenElement){ await enterFullscreen(); setKiosk(true);} else { await exitFullscreen(); setKiosk(false);} }catch{} }
         async function enableSound(){ try{ if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); await audioCtx.resume(); setSoundOn(true);}catch{} }
 
-        // market
+        // market state
         const [mid, _setMid] = useState(100);
         const [fair, _setFair] = useState(100);
         const spread = 0.10;
         const [hist, setHist] = useState([{t:0, mid:100}]);
 
-        // liquidity/impact
+        // liquidity / impact
         const BASE_DEPTH = 1000;
         const [availDepth, _setAvailDepth] = useState(BASE_DEPTH);
         const REPLENISH_PER_SEC = 0.10;
@@ -222,27 +230,32 @@
           let alive = true;
           async function go(){
             if (screen === "welcome" || screen === "end") {
-              const rows = await loadLBRemote();
-              if (alive) setLb(rows);
+              try {
+                const rows = await loadLBRemote();
+                if (alive) setLb(rows);
+              } catch(e) {
+                console.warn(e); if (alive) setLb([]);
+              }
             }
           }
           go();
           return () => { alive=false; };
         }, [screen]);
 
-        // drift toward FV (+ optional revert boost)
+        // drift toward fair value + snapback
+        const clampDrift = (x)=>Math.max(-0.12, Math.min(0.12, x));
         function driftTowardFair(){
           const d = fairRef.current - midRef.current;
-          const baseFactor = clamp(Math.abs(d)/10, 0, 1);
+          const baseFactor = Math.max(0, Math.min(1, Math.abs(d)/10));
           const BETA_PER_SEC = 0.35;
-          const betaTick = (mode==="easy" ? 0.35 : 0.35) / 10; // per 10Hz base
+          const betaTick = (mode==="easy" ? 0.35 : 0.35) / 10;
           let drift = betaTick * d * baseFactor;
           if (revertTicksRef.current > 0) {
             drift += revertStrengthRef.current * Math.sign(d) * Math.min(1, Math.abs(d)/0.5);
             setRevertTicks(t => t - 1);
             setRevertStrength(s => s * 0.6);
           }
-          return clamp(drift, -0.12, +0.12);
+          return clampDrift(drift);
         }
         function triggerRevertBoost(qty){
           if (qty >= 500) {
@@ -297,12 +310,12 @@
             const left = Math.max(0, Math.ceil((endTimeRef.current - now)/1000));
             setTimeLeft(left);
 
-            const sigmaPct = regime==="Calm" ? SIGMA_CALM_PCT : SIGMA_VOL_PCT;
+            const sigmaPct = regime==="Calm" ? 0.0015 : 0.0030;
             const sigmaAbs = fairRef.current * sigmaPct;
             let randomShock = (Math.random()*2 - 1) * sigmaAbs;
 
-            if (Math.random() < JUMP_PROB_TICK) {
-              const jMagPct = JUMP_MIN_PCT + Math.random()*(JUMP_MAX_PCT - JUMP_MIN_PCT);
+            if (Math.random() < 0.001) {
+              const jMagPct = 0.003 + Math.random()*(0.010 - 0.003);
               const sign = (Math.random()<0.5 ? -1 : +1);
               randomShock += sign * fairRef.current * jMagPct;
             }
@@ -316,8 +329,8 @@
               return nm;
             });
 
-            const repl = BASE_DEPTH * (REPLENISH_PER_SEC * (intervalMs/1000));
-            setAvail(a => clamp(a + repl, 50, BASE_DEPTH));
+            const repl = BASE_DEPTH * (0.10 * (intervalMs/1000)); // refill vs actual loop rate
+            setAvail(a => Math.max(50, Math.min(BASE_DEPTH, a + repl)));
 
             if (Math.random() < 0.03) setRegime(r => r==="Calm"?"Volatile":"Calm");
 
@@ -330,20 +343,26 @@
               if (mode === "easy") pauseFor(5000);
             }
 
+            // end round
             if (left <= 0) {
               clearInterval(loopRef.current); loopRef.current = null;
               const finalTotal = cashRef.current + reserveRef.current + posRef.current * midRef.current;
               const finalPnl = finalTotal - 100000;
+
               if (soundOn) { if (finalPnl>0) chord([523,659,784],0.6); else chord([196,233,262],0.6); }
-              if (mode === "normal") {
-                const entry = {
-                  name: (player||"").trim().replace(/\s+/g," ").slice(0,32) || "Guest",
-                  pnl: Number(finalPnl.toFixed(2)),
-                  total: Number(finalTotal.toFixed(2))
-                };
-                saveLBRemote(entry);
-              }
-              setScreen("end");
+
+              // SAVE to Supabase for Normal mode — await so it exists when end screen loads
+              (async () => {
+                if (mode === "normal") {
+                  const entry = {
+                    name: (player||"").trim().replace(/\s+/g," ").slice(0,32) || "Guest",
+                    pnl: Number(finalPnl.toFixed(2)),
+                    total: Number(finalTotal.toFixed(2))
+                  };
+                  try { await saveLBRemote(entry); } catch(e) { console.warn(e); }
+                }
+                setScreen("end");
+              })();
             }
           }, intervalMs);
 
@@ -362,37 +381,37 @@
           const aD = Math.max(50, availRef.current);
           const after100 = Math.max(0, qty - 100);
           const x = after100 / 900;
-          const curve = Math.pow(x, IMPACT_CURVE_POW);
-          const liquidityFactor = Math.pow(BASE_DEPTH / aD, LIQ_POWER);
-          const impactMag = (IMPACT_MIN + (IMPACT_MAX - IMPACT_MIN) * curve) * liquidityFactor;
+          const curve = Math.pow(x, 2.2);
+          const liquidityFactor = Math.pow(BASE_DEPTH / aD, 0.5);
+          const impactMag = (0.005 + (0.90 - 0.005) * curve) * liquidityFactor;
           const impact = sgn * impactMag;
           const endMid = Math.max(1, startMid + impact);
 
           const vwap =
             side==="BUY"
-              ? (startMid + spread/2) + 0.5 * (endMid - startMid)
-              : (startMid - spread/2) + 0.5 * (endMid - startMid);
+              ? (startMid + 0.10/2) + 0.5 * (endMid - startMid)
+              : (startMid - 0.10/2) + 0.5 * (endMid - startMid);
 
           const notional = qty * vwap;
           const fee = notional * 0.0001;
 
           if (side==="BUY") {
-            setCash(c=>c - fee);
+            _setCash(c=>c - fee);
             if (posRef.current < 0) {
-              setReserve(r => { const r2 = r - notional; if (r2 >= 0) return r2; setCash(c => c + r2); return 0; });
+              _setReserve(r => { const r2 = r - notional; if (r2 >= 0) return r2; _setCash(c => c + r2); return 0; });
             } else {
-              setCash(c=>c - notional);
+              _setCash(c=>c - notional);
             }
-            setPos(p=>p + qty);
+            _setPos(p=>p + qty);
           } else {
-            setCash(c=>c - fee);
-            if (posRef.current > 0) { setCash(c=>c + notional); }
-            else { setReserve(r=>r + notional); }
-            setPos(p=>p - qty);
+            _setCash(c=>c - fee);
+            if (posRef.current > 0) { _setCash(c=>c + notional); }
+            else { _setReserve(r=>r + notional); }
+            _setPos(p=>p - qty);
           }
 
           setTimeout(() => {
-            if (posRef.current >= 0 && reserveRef.current > 0) { setCash(c => c + reserveRef.current); setReserve(0); }
+            if (posRef.current >= 0 && reserveRef.current > 0) { _setCash(c => c + reserveRef.current); _setReserve(0); }
           }, 0);
 
           if (soundOn) { if (side==="BUY") chirp(420,880); else chirp(880,420); }
@@ -400,15 +419,13 @@
 
           setMid(endMid);
           setTick(t => { const t2=t+1; setHist(h=>[...h, {t:t2, mid:endMid}].slice(-700)); return t2; });
-          setAvail(a => clamp(a - qty, 50, BASE_DEPTH));
+          setAvail(a => Math.max(50, Math.min(BASE_DEPTH, a - qty)));
           triggerRevertBoost(qty);
         }
 
-        // ---------- UI helpers ----------
         const isMobile = typeof window !== "undefined" ? window.innerWidth <= 480 : false;
         const pnlColor = pnl>0?"text-green-600":(pnl<0?"text-rose-600":"text-gray-900");
 
-        // News banner (colored in Easy; neutral in Normal)
         function NewsBanner() {
           if (!headline) return null;
           const colored = (mode === "easy");
@@ -422,7 +439,7 @@
           ]);
         }
 
-        // ---- Screens ----
+        // === WELCOME ===
         if (screen==="welcome"){
           const leader = (lb.length===0
             ? React.createElement("div", { className:"text-sm text-gray-500" }, "No scores yet — be the first!")
@@ -481,7 +498,9 @@
                   className:"px-4 py-3 rounded-xl border shadow-sm font-semibold transition hover:bg-emerald-50 active:scale-[0.98] btn-lg" }, "Start Round"),
                 React.createElement("button", { key:"snd", onClick: enableSound,
                   className:"px-4 py-3 rounded-xl border shadow-sm text-sm transition hover:bg-slate-50 active:scale-[0.98] btn-md" },
-                  soundOn ? "🔊" : "🔇")
+                  soundOn ? "🔊" : "🔇"),
+                React.createElement("button", { key:"fs", onClick: toggleFS,
+                  className:"px-4 py-3 rounded-xl border shadow-sm text-sm transition hover:bg-slate-50 active:scale-[0.98] btn-md" }, "⤢")
               ])
             ]),
             React.createElement("div", { key:"lb", className:"p-4 rounded-2xl border shadow-sm bg-white mobile-card" }, [
@@ -491,15 +510,24 @@
           ]);
         }
 
+        // === PLAY (mobile-first) ===
         if (screen==="play"){
-          // MOBILE-FIRST LAYOUT
-          const mobileUI = React.createElement("div", { className:"max-w-md mx-auto p-3 space-y-3 mobile-pad" }, [
+          const mobileUI = React.createElement("div", { className:"max-w-screen-sm w-full mx-auto p-3 space-y-3 mobile-pad" }, [
+            React.createElement("div", { key:"hdr", className:"flex items-center justify-between text-xs text-gray-600" }, [
+              React.createElement("span", null, (mode==="easy"?"Easy":"Normal")+" · "+TICKER),
+              React.createElement("div", { className:"flex items-center gap-2" }, [
+                React.createElement("span", null, "⏱ "+timeLeft+"s"),
+                React.createElement("button", { onClick: enableSound, className:"px-2 py-1 rounded-full border bg-white" }, soundOn?"🔊":"🔇"),
+                React.createElement("button", { onClick: toggleFS, className:"px-2 py-1 rounded-full border bg-white" }, "⤢")
+              ])
+            ]),
             React.createElement(NewsBanner, { key:"nb" }),
-            React.createElement(PriceChart, { key:"ch", data: hist, title: TICKER, fairLine: fairRef.current }),
+            // Chart wrapper with NO inner padding; fills side-to-side
+            React.createElement(PriceChart, { key:"ch", data: hist, title: TICKER, fairLine: fairRef.current, mobile: true }),
             React.createElement("div", { key:"stats", className:"grid grid-cols-2 gap-2" }, [
               React.createElement("div", { className:"p-2 rounded-xl border bg-white text-center mobile-card" },
                 React.createElement("div", { className:"text-[11px] text-gray-500" }, "PnL"),
-                React.createElement("div", { className:"text-xl font-semibold "+(pnl>0?"text-green-600":(pnl<0?"text-rose-600":"text-gray-900")) }, "$"+fmt2(pnl))
+                React.createElement("div", { className:"text-xl font-semibold "+pnlColor }, "$"+fmt2(pnl))
               ),
               React.createElement("div", { className:"p-2 rounded-xl border bg-white text-center mobile-card" },
                 React.createElement("div", { className:"text-[11px] text-gray-500" }, "Position"),
@@ -520,22 +548,18 @@
                   className:"w-full btn-lg border shadow-sm font-semibold transition hover:bg-emerald-50 active:scale-[0.98]" }, "BUY")
               ]),
               React.createElement("div", { className:"text-[11px] text-gray-500 text-center" }, "Cap ±"+MAX_POS+" sh · Fee 0.01%")
-            ]),
-            React.createElement("div", { key:"footer", className:"flex items-center justify-between text-xs text-gray-600" }, [
-              React.createElement("span", null, (mode==="easy"?"Easy":"Normal")+" · "+TICKER),
-              React.createElement("span", null, "⏱ "+timeLeft+"s")
             ])
           ]);
 
-          // DESKTOP layout (unchanged essentials + fullscreen)
+          // Desktop: show fuller UI and the kiosk button too
           const desktopUI = React.createElement("div", { className:"max-w-5xl mx-auto p-4 space-y-4" }, [
-            React.createElement("header", { key:"hdr", className:"flex items-center justify-between hide-on-mobile" }, [
+            React.createElement("header", { key:"hdr", className:"flex items-center justify-between" }, [
               React.createElement("div", { key:"tr", className:"text-xl font-semibold" }, `Trader: ${player}`),
               React.createElement("div", { key:"rt", className:"flex items-center gap-2" }, [
                 React.createElement("span", { className:"px-2 py-1 rounded-full text-xs border bg-white" }, "⏱ "+timeLeft+"s"),
                 React.createElement("span", { className:"px-2 py-1 rounded-full text-xs border bg-white" }, (mode==="easy"?"Easy":"Normal")+" · "+TICKER),
                 React.createElement("button", { onClick: enableSound, className:"px-2 py-1 rounded-full text-xs border bg-white" }, soundOn?"🔊":"🔇"),
-                React.createElement("button", { onClick: toggleFS, className:"px-2 py-1 rounded-full text-xs border bg-white" }, document.fullscreenElement ? "⤢" : "⤢")
+                React.createElement("button", { onClick: toggleFS, className:"px-2 py-1 rounded-full text-xs border bg-white" }, "⤢")
               ])
             ]),
             React.createElement(NewsBanner, { key:"nb" }),
@@ -579,7 +603,7 @@
           return isMobile ? mobileUI : desktopUI;
         }
 
-        // End screen
+        // === END SCREEN ===
         if (screen==="end"){
           const finalTotalText = (cashRef.current + reserveRef.current + posRef.current*midRef.current).toLocaleString();
           const leaderBox = React.createElement("div", { className:"p-4 rounded-2xl border shadow-sm bg-white mobile-card" }, [
@@ -622,8 +646,9 @@
                 className:"px-3 py-2 rounded-xl border shadow-sm font-medium transition hover:bg-slate-50 active:scale-[0.98]"
               }, "Back to Start"),
               React.createElement("button", {
-                onClick:()=>{ setScreen("play"); // quick restart
-                  setMid(100); setFair(100); setCash(100000); setReserve(0); setPos(0);
+                onClick:()=>{ setScreen("play");
+                  // restart round quickly
+                  _setMid(100); _setFair(100); _setCash(100000); _setReserve(0); _setPos(0);
                   setTick(0); setHist([{t:0, mid:100}]); setRegime("Calm"); setHeadline(null);
                   setAvail(1000); setRevertTicks(0); setRevertStrength(0); pauseUntilRef.current = 0;
                   const now = Date.now(); startTimeRef.current=now; endTimeRef.current=now+duration*1000;
