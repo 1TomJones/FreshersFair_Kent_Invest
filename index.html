@@ -10,22 +10,21 @@
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 
-    <!-- Sanity check -->
-    <script>console.log("index.html loaded");</script>
-
     <style>
-      body {
-        background-color: #f9fafb; /* subtle gray */
-        font-family: system-ui, sans-serif;
-      }
+      body { background-color: #f9fafb; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
     </style>
   </head>
   <body class="min-h-screen flex flex-col">
-    <!-- Root container for React -->
+    <!-- Fixed logo overlay (visible on every screen) -->
+    <div class="fixed top-2 left-2 z-50">
+      <img src="assets/Kent_Invest_Logo.png" alt="Kent Invest" class="h-12 md:h-16" />
+    </div>
+
+    <!-- React root -->
     <div id="root" class="flex-1"></div>
 
-    <!-- Chart code must come before main.js -->
-    <script src="./chart.js?v=20240925c"></script>
-    <script src="./main.js?v=20240925c"></script>
+    <!-- Chart code must load before main.js -->
+    <script src="./chart.js?v=20250925m"></script>
+    <script src="./main.js?v=20250925m"></script>
   </body>
 </html>
