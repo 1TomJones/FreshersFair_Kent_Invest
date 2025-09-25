@@ -1,8 +1,8 @@
 /* chart.js — SVG PriceChart. Exposes window.PriceChart */
-
 (function () {
   const h = React.createElement;
-  const isMobileNow = () => (typeof window !== "undefined" && window.innerWidth <= 640);
+  const App = (window.App = window.App || {});
+  const isMobileNow = () => App.utils.isMobile();
 
   function PriceChart({
     data,
@@ -15,38 +15,30 @@
   }) {
     if (!data || data.length === 0) return h("div", { style: { height: "200px" } });
 
-    // --- Base drawing space ---
     const w = 1800, hgt = 560;
-
-    // Minimal internal padding on mobile to avoid visible white bands
     const BLEED = mobile ? 0 : 10;
     const yPadPct = mobile ? 0.001 : 0.02;
 
-    // Y scale
     const ys = data.map((d) => d.mid);
     let minY = Math.min(...ys), maxY = Math.max(...ys);
     const pad = (maxY - minY) * yPadPct;
     minY -= pad; maxY += pad;
     const rangeY = Math.max(1e-6, maxY - minY);
 
-    // X/Y mappers inside the current visible window
     const xOf = (i) => BLEED + (i / Math.max(1, data.length - 1)) * (w - 2 * BLEED);
     const yOf = (v) => (hgt - BLEED) - ((v - minY) / rangeY) * (hgt - 2 * BLEED);
 
-    // Helper: convert an absolute tick `t` to a visible index within `data`
-    // (data[i].t holds the absolute tick for that point)
+    // convert absolute tick to visible index
     function idxFromTick(tAbs) {
-      const t0 = data[0].t;                 // first visible tick
-      const iRel = tAbs - t0;               // relative index inside the current window
+      const t0 = data[0].t;
+      const iRel = tAbs - t0;
       return Math.max(0, Math.min(data.length - 1, iRel));
     }
 
-    // Polyline for price
     const pts = data.map((d, i) => `${xOf(i)},${yOf(d.mid)}`).join(" ");
-
     const elems = [];
 
-    // Grid + labels
+    // grid + labels
     const ticks = mobile ? 3 : 5;
     for (let k = 0; k < ticks; k++) {
       const t = k / (ticks - 1);
@@ -57,29 +49,23 @@
       elems.push(h("text", { key: "gt" + k, x: 6, y: y + 5, "text-anchor": "start", className: labCls }, Number(val).toFixed(2)));
     }
 
-    // Fair value
     if (fairLine != null) {
       const yFV = yOf(fairLine);
       elems.push(h("line", { key: "fv", x1: 0, y1: yFV, x2: w, y2: yFV, stroke: "#94a3b8", "stroke-width": 1.4, "stroke-dasharray": "4 4", opacity: 0.85 }));
     }
 
-    // Price
+    // price
     elems.push(h("polyline", { key: "pl", points: pts, fill: "none", stroke: "#000", "stroke-width": 2.2, "stroke-opacity": 0.9 }));
 
-    // VWAP (posAvg) line
+    // VWAP
     if (posAvg != null && posSide !== 0) {
       const yVW = yOf(posAvg);
       elems.push(h("line", { key: "vw", x1: 0, y1: yVW, x2: w, y2: yVW, stroke: posSide > 0 ? "#10b981" : "#ef4444", "stroke-width": 2, "stroke-dasharray": "6 4", opacity: 0.9 }));
-      elems.push(
-        h(
-          "text",
-          { key: "vwt", x: w - 8, y: yVW - 6, "text-anchor": "end", className: (posSide > 0 ? "fill-emerald-600 " : "fill-rose-600 ") + "text-[12px] font-semibold" },
-          `VWAP ${posSide > 0 ? "(long)" : "(short)"} $${Number(posAvg).toFixed(2)}`
-        )
-      );
+      elems.push(h("text", { key: "vwt", x: w - 8, y: yVW - 6, "text-anchor": "end", className: (posSide > 0 ? "fill-emerald-600 " : "fill-rose-600 ") + "text-[12px] font-semibold" },
+        `VWAP ${posSide > 0 ? "(long)" : "(short)"} $${Number(posAvg).toFixed(2)}`));
     }
 
-    // Trades (triangles) — computed from absolute tick so they scroll with history
+    // Trades (scroll with history)
     trades.forEach((tr, idx) => {
       if (typeof tr.t !== "number") return;
       const i = idxFromTick(tr.t);
@@ -89,7 +75,7 @@
       elems.push(h("polygon", { key: "tr" + idx, points, fill: isBuy ? "#2563eb" : "#ef4444", opacity: 0.9, stroke: "#0f172a", "stroke-width": 0.5 }));
     });
 
-    // News markers — bottom bubble + purple line all the way up
+    // News markers (bottom bubble + line up to top)
     const bubbleR = mobile ? 16 : 18;
     const bubbleY = hgt - (bubbleR + 6);
     const newsColor = "#7c3aed";
@@ -102,11 +88,10 @@
       elems.push(h("text", { key: "nt" + idx, x: x, y: bubbleY + 5, "text-anchor": "middle", className: "fill-gray-900 text-[14px] font-bold" }, "N"));
     });
 
-    // === Sizing ===
-    // Avoid distortion: keep natural aspect on all devices.
-    // Mobile: taller (previously 50vh → now 70vh) while still preventing whitespace.
+    // Sizing (fix C): make mobile genuinely taller
     const svgStyle = mobile
-      ? { width: "100%", height: "auto", display: "block", aspectRatio: `${w}/${hgt}`, maxHeight: "70vh" }
+      ? { width: "100%", height: "auto", display: "block",
+          aspectRatio: `${w}/${hgt}`, minHeight: "62vh", maxHeight: "76vh" }
       : { width: "100%", height: "36vh", display: "block" };
 
     return h(
@@ -116,5 +101,5 @@
     );
   }
 
-  window.PriceChart = PriceChart;
+  (window.App = window.App || {}).PriceChart = PriceChart;
 })();
