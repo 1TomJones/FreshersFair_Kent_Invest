@@ -2,7 +2,6 @@
 
 (function () {
   const h = React.createElement;
-
   const isMobileNow = () => (typeof window !== "undefined" && window.innerWidth <= 640);
 
   function PriceChart({
@@ -17,19 +16,19 @@
     if (!data || data.length === 0) return h("div", { style: { height: "200px" } });
 
     // Mobile-focused sizing/whitespace
-    const heightVh = mobile ? 58 : 36; // taller on mobile
+    // Goal: reduce internal padding, remove letterboxing, slightly taller on mobile
+    const heightVh = mobile ? 54 : 36; // adjust if you want even taller: 56–58
     const cssH = heightVh + "vh";
-    const w = 1800,
-      hgt = 560;
-    const BLEED = mobile ? 1 : 10; // very small top/bottom padding
-    const yPadPct = mobile ? 0.002 : 0.02; // minimal vertical whitespace
+    const w = 1800, hgt = 560;
+
+    // Zero internal padding on mobile
+    const BLEED = mobile ? 0 : 10;
+    const yPadPct = mobile ? 0.001 : 0.02;
 
     const ys = data.map((d) => d.mid);
-    let minY = Math.min(...ys),
-      maxY = Math.max(...ys);
+    let minY = Math.min(...ys), maxY = Math.max(...ys);
     const pad = (maxY - minY) * yPadPct;
-    minY -= pad;
-    maxY += pad;
+    minY -= pad; maxY += pad;
     const rangeY = Math.max(1e-6, maxY - minY);
 
     const xOf = (i) => BLEED + (i / Math.max(1, data.length - 1)) * (w - 2 * BLEED);
@@ -38,7 +37,7 @@
 
     const elems = [];
 
-    // light grid + readable labels
+    // Light grid + readable labels
     const ticks = mobile ? 3 : 5;
     for (let k = 0; k < ticks; k++) {
       const t = k / (ticks - 1);
@@ -49,48 +48,52 @@
       elems.push(h("text", { key: "gt" + k, x: 6, y: y + 5, "text-anchor": "start", className: labCls }, Number(val).toFixed(2)));
     }
 
-    // fair value
+    // Fair value
     if (fairLine != null) {
       const yFV = yOf(fairLine);
       elems.push(h("line", { key: "fv", x1: 0, y1: yFV, x2: w, y2: yFV, stroke: "#94a3b8", "stroke-width": 1.4, "stroke-dasharray": "4 4", opacity: 0.85 }));
     }
 
-    // price
+    // Price
     elems.push(h("polyline", { key: "pl", points: pts, fill: "none", stroke: "#000", "stroke-width": 2.2, "stroke-opacity": 0.9 }));
 
     // VWAP
     if (posAvg != null && posSide !== 0) {
       const yVW = yOf(posAvg);
       elems.push(h("line", { key: "vw", x1: 0, y1: yVW, x2: w, y2: yVW, stroke: posSide > 0 ? "#10b981" : "#ef4444", "stroke-width": 2, "stroke-dasharray": "6 4", opacity: 0.9 }));
-      elems.push(h("text", { key: "vwt", x: w - 8, y: yVW - 6, "text-anchor": "end", className: (posSide > 0 ? "fill-emerald-600 " : "fill-rose-600 ") + "text-[12px] font-semibold" }, `VWAP ${posSide > 0 ? "(long)" : "(short)"} $${Number(posAvg).toFixed(2)}`));
+      elems.push(
+        h(
+          "text",
+          { key: "vwt", x: w - 8, y: yVW - 6, "text-anchor": "end", className: (posSide > 0 ? "fill-emerald-600 " : "fill-rose-600 ") + "text-[12px] font-semibold" },
+          `VWAP ${posSide > 0 ? "(long)" : "(short)"} $${Number(posAvg).toFixed(2)}`
+        )
+      );
     }
 
-    // trades: triangles
+    // Trades (triangles)
     trades.forEach((tr, idx) => {
-      const i = tr.i;
-      if (i < 0 || i >= data.length) return;
-      const x = xOf(i),
-        y = yOf(tr.price);
-      const isBuy = tr.side === "BUY",
-        s = 6;
+      const i = tr.i; if (i < 0 || i >= data.length) return;
+      const x = xOf(i), y = yOf(tr.price);
+      const isBuy = tr.side === "BUY", s = 6;
       const points = isBuy ? `${x},${y - s} ${x - s},${y + s} ${x + s},${y + s}` : `${x},${y + s} ${x - s},${y - s} ${x + s},${y - s}`;
       elems.push(h("polygon", { key: "tr" + idx, points, fill: isBuy ? "#2563eb" : "#ef4444", opacity: 0.9, stroke: "#0f172a", "stroke-width": 0.5 }));
     });
 
-    // news: bubble at bottom + purple line to top
+    // News (bottom bubble + purple line to top)
     const bubbleR = mobile ? 16 : 18;
     const bubbleY = hgt - (bubbleR + 6);
     const newsColor = "#7c3aed";
     newsEvents.forEach((e, idx) => {
-      const i = e.i;
-      if (i < 0 || i >= data.length) return;
+      const i = e.i; if (i < 0 || i >= data.length) return;
       const x = xOf(i);
       elems.push(h("line", { key: "nl" + idx, x1: x, y1: 0, x2: x, y2: bubbleY - bubbleR, stroke: newsColor, "stroke-width": 1.8, "stroke-dasharray": "3 4", opacity: 0.9 }));
       elems.push(h("circle", { key: "nc" + idx, cx: x, cy: bubbleY, r: bubbleR, fill: "#fff", stroke: newsColor, "stroke-width": 2, opacity: 0.98 }));
       elems.push(h("text", { key: "nt" + idx, x: x, y: bubbleY + 5, "text-anchor": "middle", className: "fill-gray-900 text-[14px] font-bold" }, "N"));
     });
 
-    const par = mobile ? "xMidYMid meet" : "none";
+    // On mobile, remove letterboxing by forcing fill
+    const par = mobile ? "none" : "none";
+
     return h(
       "div",
       { className: mobile ? "bg-transparent" : "p-3 rounded-2xl border shadow-sm bg-white" },
@@ -98,6 +101,5 @@
     );
   }
 
-  // expose globally
   window.PriceChart = PriceChart;
 })();
