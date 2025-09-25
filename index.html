@@ -1,28 +1,35 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Freshers Fair — Liquidity Trading Game</title>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Freshers Fair — Liquidity Trading Game</title>
 
-    <!-- TailwindCSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Tailwind (optional, but helps styling) -->
+  <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- React -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  </head>
-  <body class="min-h-screen flex flex-col">
-    <div id="root" class="flex-1"></div>
+  <!-- React UMD -->
+  <script defer crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script defer crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 
-    <!-- Game modules -->
-    <script src="./state.js"></script>
-    <script src="./market.js"></script>
-    <script src="./trading.js"></script>
-    <script src="./chart.js"></script>
-    <script src="./ui-desktop.js"></script>
-    <script src="./ui-mobile.js"></script>
-    <script src="./app.js"></script>
-    <script src="./main.js"></script>
-  </body>
+  <style>
+    body { background: #f8fafc; font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji"; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+  <!-- Visible status so you’re never staring at a blank page -->
+  <div id="root" class="flex-1">
+    <div class="p-4 text-sm text-gray-600">Loading…</div>
+  </div>
+
+  <!-- Load your modules (order matters). We add cache busters to beat GH caching. -->
+  <script defer src="./state.js?v=1"></script>
+  <script defer src="./market.js?v=1"></script>
+  <script defer src="./trading.js?v=1"></script>
+  <script defer src="./chart.js?v=1"></script>
+  <script defer src="./ui-desktop.js?v=1"></script>
+  <script defer src="./ui-mobile.js?v=1"></script>
+  <script defer src="./app.js?v=1"></script>
+  <script defer src="./main.js?v=2"></script>
+</body>
 </html>
