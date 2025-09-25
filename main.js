@@ -1,6 +1,7 @@
 /* main.js — Freshers Fair Liquidity Trading Game
-   - Requires React 18 UMD (loaded in index.html)
-   - Requires chart.js (defines window.PriceChart)
+   Requires:
+   - React 18 UMD (index.html)
+   - chart.js (defines window.PriceChart)
 */
 
 const { useState, useEffect, useRef } = React;
@@ -47,13 +48,18 @@ const NEWS = [
 ];
 const pickNews = () => NEWS[Math.floor(Math.random()*NEWS.length)];
 
+// ---------- News strip (mobile has smaller min-height) ----------
 function NewsStrip({ headline, mode }){
   const colored = mode==="easy";
-  const base = "p-3 rounded-2xl border shadow-sm";
-  const cls = headline
+  const isMob = isMobileNow();
+  const base = "rounded-2xl border shadow-sm";
+  const padCls = isMob ? "p-2" : "p-3";
+  const clsColor = headline
     ? (colored ? (headline.pct>0?"bg-emerald-50 border-emerald-300":(headline.pct<0?"bg-rose-50 border-rose-300":"bg-slate-50 border-slate-300")) : "bg-white border-slate-200")
     : "bg-white border-slate-200";
-  return h("div",{className:`${base} ${cls}`,style:{minHeight:"64px"}},[
+  const minHStyle = { minHeight: isMob ? "48px" : "64px" };
+
+  return h("div",{className:`${base} ${padCls} ${clsColor}`, style: minHStyle},[
     h("div",{key:"a",className:"text-sm font-semibold"}, headline ? (colored ? (headline.pct>0?"▲ Positive macro":headline.pct<0?"▼ Negative macro":"→ Neutral macro") : "News") : "News"),
     h("div",{key:"b",className:"text-sm"}, headline ? headline.h : "Waiting for news…"),
     h("div",{key:"c",className:"text-xs text-gray-700 mt-1"}, headline ? `${headline.why}${headline.pct===0 ? "" : ` — fair value ${(headline.pct*100).toFixed(0)}%.`}` : "Headlines drop every 15 seconds.")
@@ -164,7 +170,6 @@ function Game(){
     setScreen("play");
     const start=Date.now(); startTimeRef.current=start; endTimeRef.current=start+dur*1000;
     scheduleRef.current=buildNewsSchedule(start,dur); nextNewsIdxRef.current=0;
-    // try kiosk
     enterFullscreen().catch(()=>{});
   }
 
@@ -330,22 +335,24 @@ function Game(){
       )
     ]);
 
-    const wrapper = isMobile ? "mx-auto w-full px-3 space-y-6" : "mx-auto w-full px-8 max-w-[1500px] space-y-6";
+    const wrapper = isMobile ? "mx-auto w-full px-3 space-y-4" : "mx-auto w-full px-8 max-w-[1500px] space-y-6";
     return h("div",{className:wrapper},[
       h("div",{className:"text-2xl font-bold"},"Freshers Fair — Liquidity Trading Game"),
-      h("div",{className:"text-sm text-gray-700 p-3 rounded-2xl border bg-white shadow-sm"},"Normal: 120s (news 15–105s). Easy: 90s and auto-pauses 5s on each headline."),
+      h("div",{className:(isMobile?"p-2":"p-3")+" rounded-2xl border bg-white shadow-sm text-sm text-gray-700"},
+        "Normal: 120s (news 15–105s). Easy: 90s and auto-pauses 5s on each headline."
+      ),
       modeBox,
-      h("div",{className:"p-4 rounded-2xl border shadow-sm bg-white grid md:grid-cols-3 gap-3 items-end"},[
+      h("div",{className:(isMobile?"p-3":"p-4")+" rounded-2xl border shadow-sm bg-white grid md:grid-cols-3 gap-3 items-end"},[
         h("div",null, h("label",{className:"text-xs text-gray-500"},"Your name"),
           h("input",{value:player,onChange:e=>{setPlayer(e.target.value); localStorage.setItem("player_name",e.target.value||"");},className:"w-full border rounded-xl px-3 py-2 mt-1",placeholder:"e.g., Alex"})
         ),
         h("div",null, h("label",{className:"text-xs text-gray-500"},"(Info) News cadence"), h("div",{className:"text-sm text-gray-600 mt-1"},"15s, 30s, … 105s")),
         h("div",{className:"flex gap-2"},
           h("button",{onClick:startRound,className:"px-4 py-3 rounded-xl border shadow-sm font-semibold hover:bg-emerald-50"},"Start Round"),
-          h("button",{onClick:()=>{ try{ ensureAudio(); audioCtx && audioCtx.resume(); setSoundOn(true); localStorage.setItem("sound_on","1"); }catch{} },className:"px-4 py-3 rounded-xl border shadow-sm text-sm hover:bg-slate-50"}, soundOn?"🔊 On":"🔇 Enable")
+          h("button",{onClick:enableSound,className:"px-4 py-3 rounded-xl border shadow-sm text-sm hover:bg-slate-50"}, soundOn?"🔊 On":"🔇 Enable")
         )
       ]),
-      h("div",{className:"p-4 rounded-2xl border shadow-sm bg-white"},[
+      h("div",{className:(isMobile?"p-3":"p-4")+" rounded-2xl border shadow-sm bg-white"},[
         h("div",{className:"text-sm font-semibold mb-2"},"Leaderboard (Normal mode) — Top 10"),
         leader,
         h("div",{className:"mt-3"}, h("button",{onClick:()=>{ if(confirm("Clear leaderboard?")){ saveLB([]); location.reload(); } }, className:"px-3 py-2 rounded-xl border text-xs hover:bg-slate-50"},"Clear Leaderboard"))
@@ -359,14 +366,15 @@ function Game(){
       h("span",{className:"px-2 py-1 rounded-full text-xs border bg-white"}, regime),
       h("span",{className:"px-2 py-1 rounded-full text-xs border bg-white"}, `⏱ ${timeLeft}s`),
       h("span",{className:"px-2 py-1 rounded-full text-xs border bg-white"}, (mode==="easy"?"Easy":"Normal")+" · "+TICKER),
-      h("button",{onClick:()=>{ try{ ensureAudio(); audioCtx && audioCtx.resume(); setSoundOn(true); localStorage.setItem("sound_on","1"); }catch{} }, className:"px-2 py-1 rounded-full text-xs border bg-white"}, soundOn ? "🔊" : "🔇"),
+      h("button",{onClick:enableSound, className:"px-2 py-1 rounded-full text-xs border bg-white"}, soundOn ? "🔊" : "🔇"),
       h("button",{onClick:async()=>{ try{ if(!document.fullscreenElement){ await enterFullscreen(); } else { await exitFullscreen(); } }catch{} }, className:"px-2 py-1 rounded-full text-xs border bg-white"}, "⤢"),
     ]);
 
     if(isMobile){
-      return h("div",{className:"mx-auto w-full px-2 space-y-3"},[
+      // Tighten vertical spacing so everything fits nicely on one screen
+      return h("div",{className:"mx-auto w-full px-2 space-y-2"},[
         h("header",{className:"flex items-center justify-between"},
-          h("div",{className:"text-xl font-bold"},"Freshers Fair — Liquidity Trading Game"), headerRight
+          h("div",{className:"text-base font-bold"},"Liquidity Trading Game"), headerRight
         ),
         h(NewsStrip,{headline, mode}),
         h(window.PriceChart,{data:hist,fairLine:fair,newsEvents:newsEventsRef.current,trades:tradesRef.current,posAvg:avgPriceRef.current,posSide:Math.sign(posRef.current),mobile:true}),
@@ -377,7 +385,7 @@ function Game(){
         h("div",{className:"p-3 rounded-2xl border bg-white space-y-2"},[
           h("div",{className:"text-sm font-semibold"},"Trade"),
           h("input",{className:"w-full border rounded-xl px-3 py-2",type:"number",min:1,step:1,value:size,onChange:e=>setSize(clamp(Number(e.target.value)||0,1,1000000)),placeholder:"Order size (shares)"}),
-          h("div",{className:"grid grid-cols-1 gap-2 mt-2"},[
+          h("div",{className:"grid grid-cols-1 gap-2 mt-1"},[
             h("button",{onClick:()=>trade("BUY"), className:"w-full px-4 py-3 rounded-xl border shadow-sm font-semibold bg-emerald-50"},"BUY"),
             h("button",{onClick:()=>trade("SELL"),className:"w-full px-4 py-3 rounded-xl border shadow-sm font-semibold bg-rose-50"},"SELL"),
           ]),
@@ -432,10 +440,10 @@ function Game(){
     ]);
   }
 
-  // end screen (no hooks)
+  // end screen
   const lb=loadLB();
   const finalTotalText=(cashRef.current + reserveRef.current + posRef.current*midRef.current).toLocaleString();
-  const wrapper=isMobile ? "mx-auto w-full px-3 space-y-6" : "mx-auto w-full px-8 max-w-[1500px] space-y-6";
+  const wrapper=isMobile ? "mx-auto w-full px-3 space-y-4" : "mx-auto w-full px-8 max-w-[1500px] space-y-6";
   return h("div",{className:wrapper},[
     h("h2",{className:"text-2xl font-bold"},"Round complete"),
     h("div",{className:"grid md:grid-cols-3 gap-3"},[
