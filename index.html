@@ -713,373 +713,140 @@ newsEventsRef.current.push({
           ]);
         }
 
-        // ---------- Screens ----------
-        if (screen==="welcome"){
-          const lb = loadLB();
-          const leader = (lb.length===0
-            ? React.createElement("div", { className:"text-sm text-gray-500" }, "No scores yet — be the first!")
-            : React.createElement("ol", { className:"text-sm space-y-1" },
-                lb.slice(0,10).map((r,i)=>
-                  React.createElement("li", { key:i, className:"flex justify-between" },
-                    React.createElement("span", null, `${i+1}. ${r.name}`),
-                    React.createElement("span", { className:r.pnl>0?"text-green-600":(r.pnl<0?"text-rose-600":"") }, `$${fmt2(r.pnl)}`)
-                  )
-                )
-              )
-          );
+// ---------- Screens ----------
+if (screen==="welcome"){
+  const lb = loadLB();
+  const leader = (lb.length===0
+    ? React.createElement("div", { className:"text-sm text-gray-500" }, "No scores yet — be the first!")
+    : React.createElement("ol", { className:"text-sm space-y-1" },
+        lb.slice(0,10).map((r,i)=>
+          React.createElement("li", { key:i, className:"flex justify-between" },
+            React.createElement("span", null, `${i+1}. ${r.name}`),
+            React.createElement("span", { className:r.pnl>0?"text-green-600":(r.pnl<0?"text-rose-600":"") }, `$${fmt2(r.pnl)}`)
+          )
+        )
+      )
+  );
 
-          const modeBox = React.createElement("div", { className:"grid md:grid-cols-2 gap-3 xl:gap-4" }, [
-            React.createElement("label", { key:"m1", className:"p-3 rounded-2xl border border-slate-200 shadow-sm bg-white flex gap-3 cursor-pointer" },
-              React.createElement("input", { type:"radio", name:"mode", className:"mt-1", checked: mode==="easy", onChange:()=>setMode("easy") }),
-              React.createElement("div", null,
-                React.createElement("div", { className:"font-semibold" }, "Easy"),
-                React.createElement("div", { className:"text-sm text-gray-600" }, "Colored news cues, auto-pause 5s on headlines, ~20% slower ticks. No leaderboard.")
-              )
-            ),
-            React.createElement("label", { key:"m2", className:"p-3 rounded-2xl border border-slate-200 shadow-sm bg-white flex gap-3 cursor-pointer" },
-              React.createElement("input", { type:"radio", name:"mode", className:"mt-1", checked: mode==="normal", onChange:()=>setMode("normal") }),
-              React.createElement("div", null,
-                React.createElement("div", { className:"font-semibold" }, "Normal"),
-                React.createElement("div", { className:"text-sm text-gray-600" }, "No assists, no pauses, full-speed ticks. Leaderboard enabled.")
-              )
-            )
-          ]);
+  const modeBox = React.createElement("div", { className:"grid md:grid-cols-2 gap-3 xl:gap-4" }, [
+    React.createElement("label", { key:"m1", className:"p-3 rounded-2xl border border-slate-200 shadow-sm bg-white flex gap-3 cursor-pointer" },
+      React.createElement("input", { type:"radio", name:"mode", className:"mt-1", checked: mode==="easy", onChange:()=>setMode("easy") }),
+      React.createElement("div", null,
+        React.createElement("div", { className:"font-semibold" }, "Easy"),
+        React.createElement("div", { className:"text-sm text-gray-600" }, "Colored news cues, auto-pause 5s on headlines, ~20% slower ticks. No leaderboard.")
+      )
+    ),
+    React.createElement("label", { key:"m2", className:"p-3 rounded-2xl border border-slate-200 shadow-sm bg-white flex gap-3 cursor-pointer" },
+      React.createElement("input", { type:"radio", name:"mode", className:"mt-1", checked: mode==="normal", onChange:()=>setMode("normal") }),
+      React.createElement("div", null,
+        React.createElement("div", { className:"font-semibold" }, "Normal"),
+        React.createElement("div", { className:"text-sm text-gray-600" }, "No assists, no pauses, full-speed ticks. Leaderboard enabled.")
+      )
+    )
+  ]);
 
-          // Container class: use wide for desktop, compact on mobile
-          const wrapperClass = isMobile ? "mx-auto w-full px-3 space-y-6" : ( (wide ? "mx-auto w-full px-4 md:px-8 xl:px-12 2xl:px-16 max-w-[1500px] 2xl:max-w-[1800px]" : "mx-auto w-full px-4 max-w-6xl") + " space-y-6");
+  const wrapperClass = isMobile ? "mx-auto w-full px-3 space-y-6"
+    : ( (wide ? "mx-auto w-full px-4 md:px-8 xl:px-12 2xl:px-16 max-w-[1500px] 2xl:max-w-[1800px]"
+              : "mx-auto w-full px-4 max-w-6xl") + " space-y-6");
 
-          return React.createElement("div", { className: wrapperClass }, [
-            React.createElement("div", { key:"brand", className:"flex items-center justify-between" }, [
-              React.createElement(Brand, { size: isMobile?36:44, withText: true, text: "Freshers Fair — Liquidity Trading Game" }),
-              !isMobile && React.createElement("button", {
-                onClick: () => setWide(w => !w),
-                className:"px-3 py-2 rounded-xl border shadow-sm text-sm btn bg-white"
-              }, wide ? "↔ Compact" : "⤢ Fit width")
-            ]),
-            React.createElement("div", { key:"intro", className:"text-sm text-gray-700 p-3 rounded-2xl border border-slate-200 bg-white shadow-sm" },
-              "Pick a mode: ", React.createElement("b", null, "Easy"),
-              " gives colored news cues, auto-pauses for 5s on headlines, and runs slower so beginners can think. ",
-              React.createElement("b", null, "Normal"),
-              " removes assists and pauses, runs full-speed, and feeds the leaderboard. ",
-              "Normal rounds are 2 minutes. Easy rounds are 90s (pauses don’t eat into that time)."
-            ),
-            modeBox,
-            React.createElement("div", { key:"start", className:"p-4 rounded-2xl border border-slate-200 shadow-sm bg-white grid md:grid-cols-3 gap-3 xl:gap-4 items-end" }, [
-              React.createElement("div", { key:"w1a" },
-                React.createElement("label", { className:"text-xs text-gray-500" }, "Your name"),
-                React.createElement("input", { value:player, onChange:e=>setPlayer(e.target.value),
-                  className:"w-full border rounded-xl px-3 py-2 mt-1", placeholder:"e.g., Alex" })
-              ),
-              React.createElement("div", { key:"w1b" },
-                React.createElement("label", { className:"text-xs text-gray-500" }, "Round duration (overridden by mode)"),
-                React.createElement("input", { type:"number", min:60, step:15, value:duration,
-                  onChange:e=>setDuration(clamp(Number(e.target.value)||120, 60, 600)),
-                  className:"w-full border rounded-xl px-3 py-2 mt-1" })
-              ),
-              React.createElement("div", { key:"w1c", className:"flex gap-2" }, [
-                React.createElement("button", { onClick: start, className:"px-4 py-3 rounded-xl border shadow-sm font-semibold btn hover:bg-emerald-50" }, "Start Round"),
-                React.createElement("button", { onClick: enableSound, className:"px-4 py-3 rounded-xl border shadow-sm text-sm btn hover:bg-slate-50" }, soundOn ? "🔊 Sound on" : "🔇 Enable sound"),
-                !isMobile && React.createElement("button", { onClick: async()=>{ await (document.fullscreenElement? exitFullscreen():enterFullscreen()); }, className:"px-4 py-3 rounded-xl border shadow-sm text-sm btn hover:bg-slate-50" }, document.fullscreenElement ? "⤢ Exit Fullscreen" : "⤢ Fullscreen (Kiosk)")
-              ])
-            ]),
-            React.createElement("div", { key:"lb", className:"p-4 rounded-2xl border border-slate-200 shadow-sm bg-white" }, [
-              React.createElement("div", { className:"text-sm font-semibold mb-2 flex items-center gap-2" }, [
-                React.createElement(Brand, { size: 20, withText: false }),
-                React.createElement("span", null, "Leaderboard (Normal mode) — Top 10")
-              ]),
-              leader,
-              React.createElement("div", { className:"mt-3" },
-                React.createElement("button", { onClick:()=>{ if(confirm("Clear leaderboard?")){ saveLB([]); location.reload(); } }, className:"px-3 py-2 rounded-xl border text-xs btn hover:bg-slate-50" }, "Clear Leaderboard")
-              )
-            ]),
-            React.createElement("p", { key:"w3", className:"text-xs text-gray-500" }, "Index proxy: think S&P 500 / FTSE 100 (broad macro sensitivity).")
-          ]);
-        }
+  return React.createElement("div", { className: wrapperClass }, [
+    React.createElement("div", { key:"brand", className:"flex items-center justify-between" }, [
+      React.createElement(Brand, { size: isMobile?36:44, withText: true, text: "Freshers Fair — Liquidity Trading Game" }),
+      !isMobile && React.createElement("button", {
+        onClick: () => setWide(w => !w),
+        className:"px-3 py-2 rounded-xl border shadow-sm text-sm btn bg-white"
+      }, wide ? "↔ Compact" : "⤢ Fit width")
+    ]),
+    React.createElement("div", { key:"intro", className:"text-sm text-gray-700 p-3 rounded-2xl border border-slate-200 bg-white shadow-sm" },
+      "Pick a mode: ", React.createElement("b", null, "Easy"),
+      " gives colored news cues, auto-pauses for 5s on headlines, and runs slower so beginners can think. ",
+      React.createElement("b", null, "Normal"),
+      " removes assists and pauses, runs full-speed, and feeds the leaderboard. ",
+      "Normal rounds are 2 minutes. Easy rounds are 90s (pauses don’t eat into that time)."
+    ),
+    modeBox,
+    React.createElement("div", { key:"start", className:"p-4 rounded-2xl border border-slate-200 shadow-sm bg-white grid md:grid-cols-3 gap-3 xl:gap-4 items-end" }, [
+      React.createElement("div", { key:"w1a" },
+        React.createElement("label", { className:"text-xs text-gray-500" }, "Your name"),
+        React.createElement("input", { value:player, onChange:e=>setPlayer(e.target.value),
+          className:"w-full border rounded-xl px-3 py-2 mt-1", placeholder:"e.g., Alex" })
+      ),
+      React.createElement("div", { key:"w1b" },
+        React.createElement("label", { className:"text-xs text-gray-500" }, "Round duration (overridden by mode)"),
+        React.createElement("input", { type:"number", min:60, step:15, value:duration,
+          onChange:e=>setDuration(clamp(Number(e.target.value)||120, 60, 600)),
+          className:"w-full border rounded-xl px-3 py-2 mt-1" })
+      ),
+      React.createElement("div", { key:"w1c", className:"flex gap-2" }, [
+        React.createElement("button", { onClick: start, className:"px-4 py-3 rounded-xl border shadow-sm font-semibold btn hover:bg-emerald-50" }, "Start Round"),
+        React.createElement("button", { onClick: enableSound, className:"px-4 py-3 rounded-xl border shadow-sm text-sm btn hover:bg-slate-50" }, soundOn ? "🔊 Sound on" : "🔇 Enable sound"),
+        !isMobile && React.createElement("button", { onClick: async()=>{ await (document.fullscreenElement? exitFullscreen():enterFullscreen()); }, className:"px-4 py-3 rounded-xl border shadow-sm text-sm btn hover:bg-slate-50" }, document.fullscreenElement ? "⤢ Exit Fullscreen" : "⤢ Fullscreen (Kiosk)")
+      ])
+    ]),
+    React.createElement("div", { key:"lb", className:"p-4 rounded-2xl border border-slate-200 shadow-sm bg-white" }, [
+      React.createElement("div", { className:"text-sm font-semibold mb-2 flex items-center gap-2" }, [
+        React.createElement(Brand, { size: 20, withText: false }),
+        React.createElement("span", null, "Leaderboard (Normal mode) — Top 10")
+      ]),
+      leader,
+      React.createElement("div", { className:"mt-3" },
+        React.createElement("button", { onClick:()=>{ if(confirm("Clear leaderboard?")){ saveLB([]); location.reload(); } }, className:"px-3 py-2 rounded-xl border text-xs btn hover:bg-slate-50" }, "Clear Leaderboard")
+      )
+    ]),
+    React.createElement("p", { key:"w3", className:"text-xs text-gray-500" }, "Index proxy: think S&P 500 / FTSE 100 (broad macro sensitivity).")
+  ]);
+}
 
-        if (screen==="play"){
-          return isMobile ? MobileLayout() : DesktopLayout();
-        }
+if (screen==="play"){
+  return isMobile ? MobileLayout() : DesktopLayout();
+}
 
 // --- end screen (Performance Summary — replaces leaderboard) ---
 // helpers (local to this render)
 const clamp01 = x => Math.max(0, Math.min(1, x));
 const pct = x => Math.round(x);
 
-// Build per-news assessments using stored trade & news refs
-// Grade first trade within ~10s after each news:
-// - Easy: ~8 Hz (125ms/tick) → ~80 ticks
-// - Normal: ~10 Hz (100ms/tick) → ~100 ticks
+// window for first trade after news
 const windowTicks = (mode === "easy") ? 80 : 100;
 
-// Derive per-news metrics (subtract Easy-mode pause; use actual trade size)
+// derive per-news metrics
 const items = newsEventsRef.current.map(ne => {
+  const tickMs = (mode === "easy") ? 125 : 100;
   const firstTrade = tradesRef.current.find(tr => tr.t > ne.t && tr.t <= ne.t + windowTicks);
   if (!firstTrade) return { reacted:false };
-
-  const tickMs = (mode === "easy") ? 125 : 100;
   const deltaTicks = firstTrade.t - ne.t;
-  // subtract pause time if Easy auto-pause was active
   const reactedMs = Math.max(0, deltaTicks * tickMs - (ne.pauseMs || 0));
-
-  // Accuracy vs macro direction (dir: +1 up, 0 flat, -1 down)
   let correct = false;
   if (ne.dir > 0 && firstTrade.side === "BUY")  correct = true;
   if (ne.dir < 0 && firstTrade.side === "SELL") correct = true;
   if (ne.dir === 0) correct = true;
-
-  return {
-    reacted: true,
-    reactedMs,
-    correct,
-    size: (typeof firstTrade.size === "number" ? firstTrade.size : 0)
-  };
+  return { reacted:true, reactedMs, correct };
 });
 
-
-// Reaction score: 100% at ≤1.0s, then -20% per extra second (floor 0)
 const reacted = items.filter(x => x.reacted);
-const avgMs = reacted.length ? reacted.reduce((s,x)=>s + x.reactedMs, 0) / reacted.length : null;
-
-let reactionScore = 50; // default if no reactions
-if (avgMs != null) {
-  const sec = avgMs / 1000;
-  if (sec <= 1) reactionScore = 100;
-  else reactionScore = Math.max(0, Math.round(100 - 20 * (sec - 1)));
-}
-
-// Accuracy score: share of correct directional entries after news
-const hasAccuracy = reacted.length>0;
-const correctCount = hasAccuracy ? reacted.filter(x=>x.correct).length : 0;
-const accuracyScore = hasAccuracy ? pct( (correctCount/reacted.length)*100 ) : 50;
-
-// Risk/Confidence: time-weighted average |position| over the whole round (tick-weighted)
-const totalTicks = Math.max(1, tickRef.current); // avoid divide-by-zero
-let twPos = 0;         // sum of |position| * ticks each segment
-let curPos = 0;        // running position as we walk trades
-let lastTick = 0;
-
-// Walk trades in order, accrue exposure between trades
-const sortedTrades = [...tradesRef.current].sort((a,b) => a.t - b.t);
-for (const tr of sortedTrades) {
-  const dur = Math.max(0, tr.t - lastTick);     // ticks held at current position
-  twPos += dur * Math.abs(curPos);
-
-  const sz = (typeof tr.size === "number") ? tr.size : 0;
-  curPos += (tr.side === "BUY" ? +sz : -sz);    // apply trade to position
-  lastTick = tr.t;
-}
-
-// Tail segment from last trade to final tick
-const tailDur = Math.max(0, totalTicks - lastTick);
-twPos += tailDur * Math.abs(curPos);
-
-// Normalize by totalTicks * MAX_POS → % score
-const riskScore = pct( clamp01( twPos / (totalTicks * MAX_POS) ) * 100 );
-
-// Short feedback
-const tips = [];
-if (accuracyScore >= 80) tips.push("Great directional trading!");
-else if (accuracyScore < 50) tips.push("Work on trading with the macro impulse.");
-if (reactionScore < 60) tips.push("React faster to headlines — execute earlier.");
-if (riskScore < 50) tips.push("Scale with conviction when the signal is clear.");
-
-const finalTotalText = (cashRef.current + reserveRef.current + posRef.current*midRef.current).toLocaleString();
-// P&L for share text/card
-const finalPnl = (cashRef.current + reserveRef.current + posRef.current*midRef.current) - 100000;
-
-// ---------- Share: simple text (WhatsApp or Web Share) ----------
-function shareResults(){
-  const msg = [
-    "Freshers Fair — Liquidity Trading Game",
-    `Trader: ${player} (${mode==="easy"?"Easy":"Normal"})`,
-    `P&L: $${fmt2(finalPnl)}`,
-    `Reaction: ${pct(reactionScore)}% · Accuracy: ${pct(accuracyScore)}% · Risk: ${pct(riskScore)}%`,
-    (tips && tips.length ? `Tip: ${tips.join(" ")}` : "")
-  ].filter(Boolean).join(" | ");
-
-  const wa = "https://wa.me/?text=" + encodeURIComponent(msg);
-
-  if (navigator.share) {
-    navigator.share({ text: msg }).catch(() => window.open(wa, "_blank"));
-  } else {
-    window.open(wa, "_blank");
-  }
-}
-
-// ---------- Share: image card (canvas → PNG → native share / open) ----------
-function hashStr(s){ // tiny hash for signature
-  let h = 2166136261>>>0;
-  for(let i=0;i<s.length;i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619)>>>0; }
-  return ("00000000"+h.toString(16)).slice(-8);
-}
-function loadImage(src){
-  return new Promise((resolve,reject)=>{
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = ()=>resolve(img);
-    img.onerror = reject;
-    img.src = src;
-  });
-}
-async function generateShareCard(){
-  const W = 1080, H = 1350, PAD = 64;
-  const c = document.createElement("canvas");
-  c.width = W; c.height = H;
-  const ctx = c.getContext("2d");
-
-  // background
-  const g = ctx.createLinearGradient(0,0,0,H);
-  g.addColorStop(0,   "#0f172a");
-  g.addColorStop(0.7, "#111827");
-  g.addColorStop(1,   "#0b1220");
-  ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
-
-  // card
-  const cardX = PAD, cardY = PAD+40, cardW = W-PAD*2, cardH = H-PAD*2-40;
-  roundRect(ctx, cardX, cardY, cardW, cardH, 28); ctx.fillStyle = "#ffffff"; ctx.fill();
-
-  // logo + title
-  try {
-    const logo = await loadImage("assets/Kent_Invest_Logo.png");
-    ctx.drawImage(logo, cardX+32, cardY+24, 96, 96);
-  } catch {}
-  ctx.fillStyle = "#0f172a";
-  ctx.font = "700 44px Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial";
-  ctx.fillText("Freshers Fair — Liquidity Trading Game", cardX+32+120, cardY+85);
-
-  // trader/mode + P&L
-  ctx.font = "600 34px Inter, system-ui, -apple-system";
-  ctx.fillStyle = "#374151";
-  ctx.fillText(`Trader: ${player}   •   ${mode==="easy"?"Easy":"Normal"}`, cardX+32, cardY+160);
-
-  const pnlColor = finalPnl>=0 ? "#059669" : "#dc2626";
-  ctx.font = "700 90px Inter, system-ui, -apple-system";
-  ctx.fillStyle = pnlColor;
-  ctx.fillText(`P&L  $${fmt2(finalPnl)}`, cardX+32, cardY+250);
-
-  // bars
-  const bars = [
-    { label: "Reaction Speed", value: Math.round(reactionScore) },
-    { label: "Directional Accuracy", value: Math.round(accuracyScore) },
-    { label: "Risk / Confidence", value: Math.round(riskScore) }
-  ];
-  let y = cardY+330;
-  bars.forEach(b=>{
-    drawBar(ctx, cardX+32, y, cardW-64, 36, b.label, b.value);
-    y += 120;
-  });
-
-  // tips
-  ctx.font = "500 28px Inter, system-ui, -apple-system";
-  ctx.fillStyle = "#374151";
-  const tipLine = (tips && tips.length) ? tips.join(" ") : "Solid round. Keep refining execution timing and sizing.";
-  wrapText(ctx, tipLine, cardX+32, y, cardW-64, 34);
-  y += 90;
-
-  // watermark/signature
-  const stamp = new Date().toLocaleString();
-  const sig = hashStr(`${player}|${mode}|${fmt2(finalPnl)}|${reactionScore}|${accuracyScore}|${riskScore}|${stamp}`);
-  ctx.font = "400 22px Inter, system-ui, -apple-system";
-  ctx.fillStyle = "#6b7280";
-  ctx.fillText(`Generated at ${stamp} • id:${sig}`, cardX+32, cardY+cardH-28);
-
-  const blob = await new Promise(res=>c.toBlob(res, "image/png", 0.95));
-  const url = URL.createObjectURL(blob);
-  return { blob, url };
-
-  // helpers
-  function roundRect(ctx,x,y,w,h,r){
-    ctx.beginPath();
-    ctx.moveTo(x+r,y);
-    ctx.arcTo(x+w,y,x+w,y+h,r);
-    ctx.arcTo(x+w,y+h,x,y+h,r);
-    ctx.arcTo(x,y+h,x,y,r);
-    ctx.arcTo(x,y,x+w,y,r);
-    ctx.closePath();
-  }
-  function drawBar(ctx,x,y,w,h,label,val){
-    ctx.font = "600 30px Inter, system-ui, -apple-system";
-    ctx.fillStyle = "#111827";
-    ctx.fillText(`${label} — ${val}%`, x, y);
-    const yy = y+18;
-    // track
-    ctx.fillStyle = "#e5e7eb"; roundRect(ctx, x, yy+16, w, h, 8); ctx.fill();
-    // fill
-    const fw = Math.round(w * Math.max(0, Math.min(1, val/100)));
-    ctx.fillStyle = "#0f172a"; roundRect(ctx, x, yy+16, fw, h, 8); ctx.fill();
-  }
-  function wrapText(ctx, text, x, y, maxWidth, lineHeight){
-    const words = text.split(" ");
-    let line = "";
-    for (let n=0;n<words.length;n++){
-      const test = line + words[n] + " ";
-      if (ctx.measureText(test).width > maxWidth && n>0){
-        ctx.fillText(line, x, y);
-        line = words[n] + " ";
-        y += lineHeight;
-      } else line = test;
-    }
-// --- end screen (Performance Summary — replaces leaderboard) ---
-// helpers (local to this render)
-const clamp01 = x => Math.max(0, Math.min(1, x));
-const pct = x => Math.round(x);
-
-// Grade first trade within ~10s after each news:
-// - Easy: ~8 Hz (125ms/tick) → ~80 ticks
-// - Normal: ~10 Hz (100ms/tick) → ~100 ticks
-const windowTicks = (mode === "easy") ? 80 : 100;
-
-// Per-news metrics
-const items = newsEventsRef.current.map(ne => {
-  const tickMs = (mode === "easy") ? 125 : 100;
-  const tradesInWindow = tradesRef.current.filter(tr => tr.t > ne.t && tr.t <= ne.t + windowTicks);
-  if (tradesInWindow.length === 0) return { reacted:false };
-
-  const firstTrade = tradesInWindow[0];
-  const deltaTicks = firstTrade.t - ne.t;
-  // subtract easy-mode pause from measured reaction time
-  const reactedMs = Math.max(0, deltaTicks * tickMs - (ne.pauseMs || 0));
-
-  let correct = false;
-  if (ne.dir > 0 && firstTrade.side === "BUY")  correct = true;
-  if (ne.dir < 0 && firstTrade.side === "SELL") correct = true;
-  if (ne.dir === 0) correct = true;
-
-  return {
-    reacted: true,
-    reactedMs,
-    correct
-  };
-});
-
-// Reaction speed: 100% at ≤1s, then -20% per extra second
-const reacted = items.filter(x => x.reacted);
-const avgMs = reacted.length ? reacted.reduce((s,x)=>s + x.reactedMs, 0) / reacted.length : null;
+const avgMs = reacted.length ? reacted.reduce((s,x)=>s+x.reactedMs,0)/reacted.length : null;
 let reactionScore = 50;
-if (avgMs != null) {
-  const sec = avgMs / 1000;
-  reactionScore = (sec <= 1) ? 100 : Math.max(0, Math.round(100 - 20 * (sec - 1)));
+if (avgMs != null){
+  const sec = avgMs/1000;
+  reactionScore = (sec<=1) ? 100 : Math.max(0, Math.round(100 - 20*(sec-1)));
 }
-
-// Accuracy: share of correct directions after news
 const accuracyScore = reacted.length ? pct( reacted.filter(x=>x.correct).length / reacted.length * 100 ) : 50;
 
-// Risk/Confidence: time-weighted average |position| over whole round
+// Risk/Confidence: time-weighted |position|
 const totalTicks = Math.max(1, tickRef.current);
 let twPos = 0, curPos = 0, lastTick = 0;
-const sortedTrades = [...tradesRef.current].sort((a,b)=>a.t - b.t);
+const sortedTrades = [...tradesRef.current].sort((a,b)=>a.t-b.t);
 for (const tr of sortedTrades){
   const dur = Math.max(0, tr.t - lastTick);
   twPos += dur * Math.abs(curPos);
   const sz = (typeof tr.size === "number") ? tr.size : 0;
-  curPos += (tr.side === "BUY" ? +sz : -sz);
+  curPos += (tr.side==="BUY" ? +sz : -sz);
   lastTick = tr.t;
 }
 const tailDur = Math.max(0, totalTicks - lastTick);
 twPos += tailDur * Math.abs(curPos);
 const riskScore = pct( clamp01( twPos / (totalTicks * MAX_POS) ) * 100 );
 
-// Feedback
 const tips = [];
 if (accuracyScore >= 80) tips.push("Great directional trading!");
 else if (accuracyScore < 50) tips.push("Work on trading with the macro impulse.");
@@ -1088,62 +855,218 @@ if (riskScore < 50) tips.push("Scale with conviction when the signal is clear.")
 
 const finalTotalText = (cashRef.current + reserveRef.current + posRef.current*midRef.current).toLocaleString();
 const finalPnl = (cashRef.current + reserveRef.current + posRef.current*midRef.current) - 100000;
-const endWrapper = isMobile ? "mx-auto w-full px-3 space-y-6" : (containerClass + " space-y-6");
 
-// ---------- Share: text ----------
-function shareResults(){
-  const msg = [
-    "Freshers Fair — Liquidity Trading Game",
-    `Trader: ${player} (${mode==="easy"?"Easy":"Normal"})`,
-    `P&L: $${fmt2(finalPnl)}`,
-    `Reaction: ${pct(reactionScore)}% · Accuracy: ${pct(accuracyScore)}% · Risk: ${pct(riskScore)}%`,
-    (tips.length ? `Tip: ${tips.join(" ")}` : "")
-  ].filter(Boolean).join(" | ");
-  const wa = "https://wa.me/?text=" + encodeURIComponent(msg);
-  if (navigator.share) {
-    navigator.share({ text: msg }).catch(() => window.open(wa, "_blank"));
-  } else {
-    window.open(wa, "_blank");
+// --- replace loadImage helper with this robust version ---
+function loadImage(src){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    if (/^https?:/i.test(src)) img.crossOrigin = "anonymous"; // only for remote URLs
+    img.onload  = () => resolve(img);
+    img.onerror = (e) => reject(new Error("Image load failed: " + src));
+    img.src = src;
+  });
+}
+
+// --- robust share card, auto-fallback if external images taint the canvas ---
+async function generateShareCard(opts = { skipImages:false }) {
+  const BANNER_PATH = "assets/Business_card_image.png"; // your new banner
+  const LOGO_PATH   = "assets/Kent_Invest_Logo.png";    // existing logo
+
+  // Pull a compact price series for sparkline
+  const series = (hist && hist.length ? hist : [{mid:100}]).slice(-160).map(d => d.mid);
+  const minP = Math.min(...series), maxP = Math.max(...series);
+  const range = Math.max(1e-6, maxP - minP);
+
+  const W = 1080, H = 1350, PAD = 60;
+  const c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  const ctx = c.getContext("2d");
+
+  // Background
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, "#0f172a"); bg.addColorStop(1, "#111827");
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+  // Card
+  const cardX = PAD, cardY = PAD + 30, cardW = W - PAD*2, cardH = H - PAD*2 - 30;
+  roundRect(ctx, cardX, cardY, cardW, cardH, 28);
+  ctx.fillStyle = "#ffffff"; ctx.fill();
+
+  // Logo (top-left)
+  if (!opts.skipImages) {
+    try {
+      const logo = await loadImage(LOGO_PATH);
+      ctx.drawImage(logo, cardX+28, cardY+20, 88, 88);
+    } catch (e) {
+      console.warn("Logo load failed:", e);
+    }
+  }
+
+  // Title
+  ctx.fillStyle = "#0f172a";
+  ctx.font = "700 40px Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial";
+  ctx.fillText("Freshers Fair — Liquidity Trading Game", cardX+28+100, cardY+72);
+
+  // Badges
+  const badgeY = cardY + 120;
+  drawBadge(ctx, cardX+28,   badgeY, (mode==="easy" ? "Easy" : "Normal"));
+  drawBadge(ctx, cardX+160,  badgeY, `Ticker ${TICKER}`);
+  const _finalPnl = (cashRef.current + reserveRef.current + posRef.current*midRef.current) - 100000;
+  const pnlColor = (_finalPnl>=0 ? "#059669" : "#dc2626");
+  drawBadge(ctx, cardX+320,  badgeY, `P&L ${_finalPnl>=0 ? "▲" : "▼"} $${fmt2(_finalPnl)}`, pnlColor);
+
+  // Metrics (short names)
+  const labels = [
+    { label:"Reaction",  val: Math.round(typeof reactionScore === "number" ? reactionScore : 50) },
+    { label:"Accuracy",  val: Math.round(typeof accuracyScore === "number" ? accuracyScore : 50) },
+    { label:"Exposure",  val: Math.round(typeof riskScore === "number" ? riskScore : 50) }
+  ];
+  const mX = cardX+28, mY = badgeY + 44, mW = cardW-56, gap = 24;
+  const cols = 3, cw = Math.floor((mW - gap*(cols-1)) / cols), ch = 120;
+  labels.forEach((m, i) => drawMetric(ctx, mX + i*(cw+gap), mY, cw, ch, m.label, m.val));
+
+  // Sparkline
+  const sX = cardX+28, sY = mY + ch + 48, sW = cardW - 56, sH = 210;
+  ctx.font = "700 30px Inter, system-ui, -apple-system";
+  ctx.fillStyle = "#0f172a";
+  ctx.fillText("Session Sparkline", sX, sY - 12);
+  roundRect(ctx, sX, sY, sW, sH, 16);
+  ctx.fillStyle = "#f8fafc"; ctx.fill();
+
+  if (series.length >= 2){
+    ctx.beginPath();
+    for (let i=0;i<series.length;i++){
+      const t = i/(series.length-1);
+      const x = sX + 10 + t * (sW - 20);
+      const y = sY + sH - 10 - ((series[i]-minP)/range) * (sH - 20);
+      (i===0) ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    }
+    ctx.strokeStyle = "#0f172a"; ctx.lineWidth = 3; ctx.stroke();
+    const g = ctx.createLinearGradient(0, sY, 0, sY + sH);
+    g.addColorStop(0, "rgba(15,23,42,0.12)");
+    g.addColorStop(1, "rgba(15,23,42,0.00)");
+    ctx.fillStyle = g;
+    ctx.lineTo(sX + sW - 10, sY + sH - 10);
+    ctx.lineTo(sX + 10,       sY + sH - 10);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Coach’s note
+  const tipsArr = [];
+  if (typeof accuracyScore === "number" && accuracyScore >= 80) tipsArr.push("Great directional trading!");
+  else if (typeof accuracyScore === "number" && accuracyScore < 50) tipsArr.push("Trade with the macro impulse.");
+  if (typeof reactionScore === "number" && reactionScore < 60) tipsArr.push("Execute earlier after news.");
+  if (typeof riskScore === "number" && riskScore < 50) tipsArr.push("Scale with conviction.");
+  const coachY = sY + sH + 44;
+  ctx.font = "600 28px Inter, system-ui, -apple-system";
+  ctx.fillStyle = "#0f172a";
+  ctx.fillText("Coach’s Note", sX, coachY);
+  ctx.font = "500 26px Inter, system-ui, -apple-system";
+  ctx.fillStyle = "#374151";
+  const tipLine = (tipsArr.length ? tipsArr.join(" ") : "React faster to headlines — execute earlier. Scale with conviction.");
+  ctx.fillText(tipLine.length > 90 ? tipLine.slice(0, 87) + "…" : tipLine, sX, coachY + 36);
+
+  // Banner image (fills remaining space)
+  const bannerX = cardX + 28;
+  const bannerY = coachY + 36 + 28;
+  const bannerW = cardW - 56;
+  const bannerBottomPad = 40;
+  const bannerH = Math.max(0, cardY + cardH - bannerBottomPad - bannerY);
+
+  if (!opts.skipImages && bannerH > 60) {
+    try {
+      const banner = await loadImage(BANNER_PATH);
+      drawImageCover(ctx, banner, bannerX, bannerY, bannerW, bannerH, 12);
+    } catch (e) {
+      console.warn("Banner load failed:", e);
+    }
+  }
+
+  // Footer
+  const stamp = new Date().toLocaleString();
+  const sig = (function hashStr(s){ let h=2166136261>>>0; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619)>>>0;} return ("00000000"+h.toString(16)).slice(-8); })
+              (`${player}|${mode}|${fmt2(_finalPnl)}|${reactionScore}|${accuracyScore}|${riskScore}|${stamp}`);
+  ctx.font = "400 20px Inter, system-ui, -apple-system";
+  ctx.fillStyle = "#6b7280";
+  ctx.fillText(`Generated ${stamp} • id:${sig}`, cardX+28, cardY+cardH-24);
+
+  // Try to produce a blob. If it fails due to taint, auto-retry without images.
+  try {
+    const blob = await new Promise((res, rej) => {
+      c.toBlob(b => b ? res(b) : rej(new Error("toBlob returned null")), "image/png", 0.95);
+    });
+    const url = URL.createObjectURL(blob);
+    return { blob, url };
+  } catch (err) {
+    console.warn("toBlob failed (likely tainted). Retrying without images…", err);
+    if (!opts.skipImages) {
+      return await generateShareCard({ skipImages:true });
+    }
+    // As last resort, dataURL
+    const dataUrl = c.toDataURL("image/png");
+    const byteString = atob(dataUrl.split(",")[1]);
+    const mimeString = dataUrl.split(",")[0].split(":")[1].split(";")[0];
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    for (let i=0;i<byteString.length;i++) ia[i] = byteString.charCodeAt(i);
+    return { blob: new Blob([ab], { type: mimeString }), url: dataUrl };
+  }
+
+  // --- helpers ---
+  function roundRect(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+  function drawBadge(ctx,x,y,label,color){
+    const padX=12, padY=8;
+    ctx.font = "600 24px Inter, system-ui, -apple-system";
+    const bw = ctx.measureText(label).width + padX*2;
+    roundRect(ctx, x, y-26, bw, 36, 18);
+    ctx.fillStyle = color || "#eef2ff"; ctx.fill();
+    ctx.fillStyle = color ? "#ffffff" : "#4338ca";
+    ctx.fillText(label, x+padX, y);
+  }
+  function drawMetric(ctx,x,y,w,h,label,val){
+    roundRect(ctx,x,y,w,h,14); ctx.fillStyle="#f8fafc"; ctx.fill();
+    ctx.font="700 26px Inter, system-ui, -apple-system"; ctx.fillStyle="#0f172a"; ctx.fillText(label, x+14, y+32);
+    const bx=x+14, by=y+52, bw=w-28, bh=20;
+    roundRect(ctx,bx,by,bw,bh,10); ctx.fillStyle="#e5e7eb"; ctx.fill();
+    const fw=Math.round(bw*Math.max(0,Math.min(1,val/100)));
+    roundRect(ctx,bx,by,fw,bh,10); ctx.fillStyle="#0f172a"; ctx.fill();
+    ctx.font="700 28px Inter, system-ui, -apple-system"; ctx.fillStyle="#111827";
+    const valText=`${val}%`;
+    ctx.fillText(valText, x+w-14-ctx.measureText(valText).width, y+32);
+  }
+  function drawImageCover(ctx, img, x, y, w, h, radius=0){
+    const iw=img.width, ih=img.height, ir=iw/ih, rr=w/h;
+    let dw, dh, dx, dy;
+    if (ir > rr){ dh=h; dw=dh*ir; dx=x+(w-dw)/2; dy=y; }
+    else       { dw=w; dh=dw/ir; dx=x; dy=y+(h-dh)/2; }
+    if (radius>0){ roundRect(ctx,x,y,w,h,radius); ctx.save(); ctx.clip(); ctx.drawImage(img, dx, dy, dw, dh); ctx.restore(); }
+    else { ctx.drawImage(img, dx, dy, dw, dh); }
   }
 }
 
-// ---------- Share: image card ----------
-function hashStr(s){ let h = 2166136261>>>0; for(let i=0;i<s.length;i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619)>>>0; } return ("00000000"+h.toString(16)).slice(-8); }
-function loadImage(src){ return new Promise((resolve,reject)=>{ const img=new Image(); img.crossOrigin="anonymous"; img.onload=()=>resolve(img); img.onerror=reject; img.src=src; }); }
-async function generateShareCard(){
-  const W=1080,H=1350,P=64, c=document.createElement("canvas"); c.width=W; c.height=H; const ctx=c.getContext("2d");
-  const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,"#0f172a"); g.addColorStop(0.7,"#111827"); g.addColorStop(1,"#0b1220"); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
-  const x=P,y=P+40,w=W-P*2,h=H-P*2-40; roundRect(ctx,x,y,w,h,28); ctx.fillStyle="#fff"; ctx.fill();
-  try{ const logo=await loadImage("assets/Kent_Invest_Logo.png"); ctx.drawImage(logo,x+32,y+24,96,96);}catch{}
-  ctx.fillStyle="#0f172a"; ctx.font="700 44px Inter, system-ui, -apple-system"; ctx.fillText("Freshers Fair — Liquidity Trading Game", x+152, y+85);
-  ctx.font="600 34px Inter, system-ui, -apple-system"; ctx.fillStyle="#374151"; ctx.fillText(`Trader: ${player}   •   ${mode==="easy"?"Easy":"Normal"}`, x+32, y+160);
-  ctx.font="700 90px Inter, system-ui, -apple-system"; ctx.fillStyle=(finalPnl>=0?"#059669":"#dc2626"); ctx.fillText(`P&L  $${fmt2(finalPnl)}`, x+32, y+250);
-  let yy=y+330; [
-    {label:"Reaction Speed", value:Math.round(reactionScore)},
-    {label:"Directional Accuracy", value:Math.round(accuracyScore)},
-    {label:"Risk / Confidence", value:Math.round(riskScore)}
-  ].forEach(b=>{ drawBar(ctx,x+32,yy,w-64,36,b.label,b.value); yy+=120; });
-  ctx.font="500 28px Inter, system-ui, -apple-system"; ctx.fillStyle="#374151";
-  wrapText(ctx, (tips.length?tips.join(" "):"Solid round. Keep refining execution timing and sizing."), x+32, yy, w-64, 34);
-  const stamp=new Date().toLocaleString(); const sig=hashStr(`${player}|${mode}|${fmt2(finalPnl)}|${reactionScore}|${accuracyScore}|${riskScore}|${stamp}`);
-  ctx.font="400 22px Inter, system-ui, -apple-system"; ctx.fillStyle="#6b7280"; ctx.fillText(`Generated at ${stamp} • id:${sig}`, x+32, y+h-28);
-  const blob=await new Promise(res=>c.toBlob(res,"image/png",0.95)); const url=URL.createObjectURL(blob); return { blob, url };
-  function roundRect(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
-  function drawBar(ctx,x,y,w,h,label,val){ ctx.font="600 30px Inter, system-ui, -apple-system"; ctx.fillStyle="#111827"; ctx.fillText(`${label} — ${val}%`, x, y); const ty=y+18;
-    ctx.fillStyle="#e5e7eb"; roundRect(ctx,x,ty+16,w,h,8); ctx.fill();
-    const fw=Math.round(w*Math.max(0,Math.min(1,val/100))); ctx.fillStyle="#0f172a"; roundRect(ctx,x,ty+16,fw,h,8); ctx.fill(); }
-  function wrapText(ctx,text,x,y,maxW,lineH){ const words=text.split(" "); let line=""; for(let i=0;i<words.length;i++){ const test=line+words[i]+" "; if(ctx.measureText(test).width>maxW && i>0){ ctx.fillText(line,x,y); line=words[i]+" "; y+=lineH; } else line=test; } if(line) ctx.fillText(line,x,y); }
-}
+
 async function shareResultsImage(){
-  try{
+  try {
     const { blob, url } = await generateShareCard();
     const file = new File([blob], "trading_score.png", { type:"image/png" });
-    if (navigator.canShare && navigator.canShare({ files:[file] })){ await navigator.share({ files:[file], title:"Trading Game Score" }); return; }
+
+    // Native share with file (Android/iOS Chrome → WhatsApp works)
+    if (navigator.canShare && navigator.canShare({ files:[file] })) {
+      await navigator.share({ files:[file], title:"Trading Game Score" });
+      return;
+    }
+
+    // Fallback: open PNG in new tab (user can save/share manually)
     window.open(url, "_blank");
-  }catch{ shareResults(); }
+
+  } catch(e) {
+    console.error("Share failed:", e);
+    alert("Unable to generate share image. Please try again.");
+  }
 }
 
-// Tooltip bar component
+// tiny bar component
 function Bar({label, value, tooltip}){
   return React.createElement("div", { className:"p-3 rounded-2xl border border-slate-200 shadow-sm bg-white relative" }, [
     React.createElement("div", { className:"flex items-center justify-between text-[13px] text-gray-500 mb-1" }, [
@@ -1158,6 +1081,8 @@ function Bar({label, value, tooltip}){
     )
   ]);
 }
+
+const endWrapper = isMobile ? "mx-auto w-full px-3 space-y-6" : (containerClass + " space-y-6");
 
 return React.createElement("div", { className: endWrapper }, [
   React.createElement("div", { key:"brand", className:"flex items-center justify-between" }, [
@@ -1190,286 +1115,27 @@ return React.createElement("div", { className: endWrapper }, [
   ]),
   React.createElement("div", { key:"e3", className:"mt-3 flex gap-2 flex-wrap" }, [
     React.createElement("button", { onClick: shareResultsImage, className:"px-3 py-2 rounded-xl border shadow-sm font-medium btn bg-green-50" }, "Share Image"),
-    React.createElement("button", { onClick: shareResults, className:"px-3 py-2 rounded-xl border shadow-sm font-medium btn bg-emerald-50" }, "Share on WhatsApp (text)"),
+
     React.createElement("button", { onClick:()=>setScreen("welcome"), className:"px-3 py-2 rounded-xl border shadow-sm font-medium btn hover:bg-slate-50" }, "Back to Start"),
-    React.createElement("button", {
-      onClick:()=>{ 
-        setScreen("play");
-        const dur=(mode==="easy")?90:120; setDuration(dur); setTimeLeft(dur);
-        setMid(100); setFair(100); setCash(100000); setReserve(0); setPos(0);
-        setTick(0); tickRef.current = 0;
-        setHist([{t:0, mid:100}]); setRegime("Calm"); setHeadline(null); setNotice("");
-        setAvail(1000); setRevertTicks(0); setRevertStrength(0); pauseUntilRef.current = 0;
-        newsEventsRef.current=[]; tradesRef.current=[]; avgPriceRef.current=null;
-        const now = Date.now(); startTimeRef.current=now; endTimeRef.current=now+dur*1000;
-        scheduleRef.current = (function(startMs, durSeconds){ const last=durSeconds-15; const arr=[]; for(let s=15;s<=last;s+=15) arr.push(startMs + s*1000); return arr; })(now, dur);
-        nextNewsIdxRef.current=0;
-      },
-      className:"px-3 py-2 rounded-xl border shadow-sm font-medium btn hover:bg-emerald-50"
-    }, "Play Again")
+    React.createElement("button", { onClick:()=>{ 
+      setScreen("play");
+      const dur=(mode==="easy")?90:120; setDuration(dur); setTimeLeft(dur);
+      setMid(100); setFair(100); setCash(100000); setReserve(0); setPos(0);
+      setTick(0); tickRef.current = 0;
+      setHist([{t:0, mid:100}]); setRegime("Calm"); setHeadline(null); setNotice("");
+      setAvail(1000); setRevertTicks(0); setRevertStrength(0); pauseUntilRef.current = 0;
+      newsEventsRef.current=[]; tradesRef.current=[]; avgPriceRef.current=null;
+      const now = Date.now(); startTimeRef.current=now; endTimeRef.current=now+dur*1000;
+      scheduleRef.current = (function(startMs, durSeconds){ const last=durSeconds-15; const arr=[]; for(let s=15;s<=last;s+=15) arr.push(startMs + s*1000); return arr; })(now, dur);
+      nextNewsIdxRef.current=0;
+    }, className:"px-3 py-2 rounded-xl border shadow-sm font-medium btn hover:bg-emerald-50" }, "Play Again")
   ])
 ]);
 
-    
-}
+} // <-- closes function Game()
 
-return React.createElement("div", { className: endWrapper }, [
-  React.createElement("div", { key:"brand", className:"flex items-center justify-between" }, [
-    React.createElement(Brand, { size: isMobile?36:44, withText: true, text: "Freshers Fair — Liquidity Trading Game" }),
-    !isMobile && React.createElement("button", {
-      onClick: () => setWide(w => !w),
-      className:"px-3 py-2 rounded-xl border shadow-sm text-sm btn bg-white"
-    }, wide ? "↔ Compact" : "⤢ Fit width")
-  ]),
-  React.createElement("h2", { key:"e0", className:"text-2xl font-bold" }, "Round complete"),
-  React.createElement("div", { key:"e1", className:"grid md:grid-cols-3 gap-3 xl:gap-4" }, [
-    React.createElement("div", { key:"e1a", className:"p-3 rounded-2xl border border-slate-200 shadow-sm bg-white" },
-      React.createElement("div", { className:"text-xs text-gray-500" }, "Trader"),
-      React.createElement("div", { className:"text-2xl font-semibold" }, player)
-    ),
-    React.createElement("div", { key:"e1b", className:"p-3 rounded-2xl border border-slate-200 shadow-sm bg-white" },
-      React.createElement("div", { className:"text-xs text-gray-500" }, "Mode"),
-      React.createElement("div", { className:"text-2xl font-semibold" }, mode==="easy"?"Easy":"Normal")
-    ),
-    React.createElement("div", { key:"e1c", className:"p-3 rounded-2xl border border-slate-200 shadow-sm bg-white" },
-      React.createElement("div", { className:"text-xs text-gray-500" }, "Total Value"),
-      React.createElement("div", { className:"text-2xl font-semibold" }, "$"+finalTotalText)
-    )
-  ]),
-
-  // --- NEW PERFORMANCE PANEL (no leaderboard) ---
-  React.createElement("div", { key:"perf", className:"p-4 rounded-2xl border border-slate-200 shadow-sm bg-white space-y-3" }, [
-// --- end screen (Performance Summary — replaces leaderboard) ---
-// helpers (local to this render)
-const clamp01 = x => Math.max(0, Math.min(1, x));
-const pct = x => Math.round(x);
-
-// Build per-news assessments using stored trade & news refs
-// Grade first trade within ~10s after each news:
-// - Easy: ~8 Hz (125ms/tick) → ~80 ticks
-// - Normal: ~10 Hz (100ms/tick) → ~100 ticks
-const windowTicks = (mode === "easy") ? 80 : 100;
-
-// Derive per-news metrics (subtract Easy pause; use actual trade size)
-const items = newsEventsRef.current.map(ne => {
-  const tickMs = (mode === "easy") ? 125 : 100;
-  const tradesInWindow = tradesRef.current.filter(tr => tr.t > ne.t && tr.t <= ne.t + windowTicks);
-  if (tradesInWindow.length === 0) return { reacted:false };
-
-  const firstTrade = tradesInWindow[0];
-  const deltaTicks = firstTrade.t - ne.t;
-  const reactedMs = Math.max(0, deltaTicks * tickMs - (ne.pauseMs || 0));
-
-  let correct = false;
-  if (ne.dir > 0 && firstTrade.side === "BUY")  correct = true;
-  if (ne.dir < 0 && firstTrade.side === "SELL") correct = true;
-  if (ne.dir === 0) correct = true;
-
-  // confidence alternative data kept in case we ever switch back:
-  const earlyTicks = Math.round(1500 / tickMs);
-  const tradesEarly = tradesInWindow.filter(tr => tr.t <= ne.t + earlyTicks);
-  const aggSize = tradesEarly.reduce((s, tr) => s + (typeof tr.size === "number" ? tr.size : 0), 0);
-
-  return {
-    reacted: true,
-    reactedMs,
-    correct,
-    firstSize: (typeof firstTrade.size === "number" ? firstTrade.size : 0),
-    aggSize
-  };
-});
-
-// Reaction score: 100% at ≤1.0s, then -20% per extra second (floor 0)
-const reacted = items.filter(x => x.reacted);
-const avgMs = reacted.length ? reacted.reduce((s,x)=>s + x.reactedMs, 0) / reacted.length : null;
-let reactionScore = 50; // default if no reactions
-if (avgMs != null) {
-  const sec = avgMs / 1000;
-  if (sec <= 1) reactionScore = 100;
-  else reactionScore = Math.max(0, Math.round(100 - 20 * (sec - 1)));
-}
-
-// Accuracy score
-const hasAccuracy = reacted.length>0;
-const correctCount = hasAccuracy ? reacted.filter(x=>x.correct).length : 0;
-const accuracyScore = hasAccuracy ? pct( (correctCount/reacted.length)*100 ) : 50;
-
-// Risk/Confidence: time-weighted average |position| over the whole round (tick-weighted)
-const totalTicks = Math.max(1, tickRef.current);
-let twPos = 0;
-let curPos = 0;
-let lastTick = 0;
-const sortedTrades = [...tradesRef.current].sort((a,b) => a.t - b.t);
-for (const tr of sortedTrades) {
-  const dur = Math.max(0, tr.t - lastTick);
-  twPos += dur * Math.abs(curPos);
-  const sz = (typeof tr.size === "number") ? tr.size : 0;
-  curPos += (tr.side === "BUY" ? +sz : -sz);
-  lastTick = tr.t;
-}
-const tailDur = Math.max(0, totalTicks - lastTick);
-twPos += tailDur * Math.abs(curPos);
-const riskScore = pct( clamp01( twPos / (totalTicks * MAX_POS) ) * 100 );
-
-// Short feedback
-const tips = [];
-if (accuracyScore >= 80) tips.push("Great directional trading!");
-else if (accuracyScore < 50) tips.push("Work on trading with the macro impulse.");
-if (reactionScore < 60) tips.push("React faster to headlines — execute earlier.");
-if (riskScore < 50) tips.push("Scale with conviction when the signal is clear.");
-
-const finalTotalText = (cashRef.current + reserveRef.current + posRef.current*midRef.current).toLocaleString();
-const finalPnl = (cashRef.current + reserveRef.current + posRef.current*midRef.current) - 100000;
-const endWrapper = isMobile ? "mx-auto w-full px-3 space-y-6" : (containerClass + " space-y-6");
-
-// ---------- Share: simple text ----------
-function shareResults(){
-  const msg = [
-    "Freshers Fair — Liquidity Trading Game",
-    `Trader: ${player} (${mode==="easy"?"Easy":"Normal"})`,
-    `P&L: $${fmt2(finalPnl)}`,
-    `Reaction: ${pct(reactionScore)}% · Accuracy: ${pct(accuracyScore)}% · Risk: ${pct(riskScore)}%`,
-    (tips && tips.length ? `Tip: ${tips.join(" ")}` : "")
-  ].filter(Boolean).join(" | ");
-
-  const wa = "https://wa.me/?text=" + encodeURIComponent(msg);
-  if (navigator.share) {
-    navigator.share({ text: msg }).catch(() => window.open(wa, "_blank"));
-  } else {
-    window.open(wa, "_blank");
-  }
-}
-
-// ---------- Share: image card (canvas → PNG → native share/open) ----------
-function hashStr(s){ let h = 2166136261>>>0; for(let i=0;i<s.length;i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619)>>>0; } return ("00000000"+h.toString(16)).slice(-8); }
-function loadImage(src){ return new Promise((resolve,reject)=>{ const img = new Image(); img.crossOrigin="anonymous"; img.onload=()=>resolve(img); img.onerror=reject; img.src=src; }); }
-async function generateShareCard(){
-  const W=1080,H=1350,PAD=64; const c=document.createElement("canvas"); c.width=W; c.height=H; const ctx=c.getContext("2d");
-  const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,"#0f172a"); g.addColorStop(0.7,"#111827"); g.addColorStop(1,"#0b1220"); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
-  const cardX=PAD,cardY=PAD+40,cardW=W-PAD*2,cardH=H-PAD*2-40; roundRect(ctx,cardX,cardY,cardW,cardH,28); ctx.fillStyle="#ffffff"; ctx.fill();
-  try{ const logo=await loadImage("assets/Kent_Invest_Logo.png"); ctx.drawImage(logo,cardX+32,cardY+24,96,96);}catch{}
-  ctx.fillStyle="#0f172a"; ctx.font="700 44px Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial"; ctx.fillText("Freshers Fair — Liquidity Trading Game", cardX+32+120, cardY+85);
-  ctx.font="600 34px Inter, system-ui, -apple-system"; ctx.fillStyle="#374151"; ctx.fillText(`Trader: ${player}   •   ${mode==="easy"?"Easy":"Normal"}`, cardX+32, cardY+160);
-  const pnlColor=finalPnl>=0?"#059669":"#dc2626"; ctx.font="700 90px Inter, system-ui, -apple-system"; ctx.fillStyle=pnlColor; ctx.fillText(`P&L  $${fmt2(finalPnl)}`, cardX+32, cardY+250);
-  const bars=[{label:"Reaction Speed",value:Math.round(reactionScore)},{label:"Directional Accuracy",value:Math.round(accuracyScore)},{label:"Risk / Confidence",value:Math.round(riskScore)}];
-  let y=cardY+330; bars.forEach(b=>{ drawBar(ctx,cardX+32,y,cardW-64,36,b.label,b.value); y+=120; });
-  ctx.font="500 28px Inter, system-ui, -apple-system"; ctx.fillStyle="#374151"; const tipLine=(tips&&tips.length)?tips.join(" "):"Solid round. Keep refining execution timing and sizing."; wrapText(ctx,tipLine,cardX+32,y,cardW-64,34); y+=90;
-  const stamp=new Date().toLocaleString(); const sig=hashStr(`${player}|${mode}|${fmt2(finalPnl)}|${reactionScore}|${accuracyScore}|${riskScore}|${stamp}`); ctx.font="400 22px Inter, system-ui, -apple-system"; ctx.fillStyle="#6b7280"; ctx.fillText(`Generated at ${stamp} • id:${sig}`, cardX+32, cardY+cardH-28);
-  const blob=await new Promise(res=>c.toBlob(res,"image/png",0.95)); const url=URL.createObjectURL(blob); return { blob, url };
-  function roundRect(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
-  function drawBar(ctx,x,y,w,h,label,val){ ctx.font="600 30px Inter, system-ui, -apple-system"; ctx.fillStyle="#111827"; ctx.fillText(`${label} — ${val}%`, x, y); const yy=y+18; ctx.fillStyle="#e5e7eb"; roundRect(ctx,x,yy+16,w,h,8); ctx.fill(); const fw=Math.round(w*Math.max(0,Math.min(1,val/100))); ctx.fillStyle="#0f172a"; roundRect(ctx,x,yy+16,fw,h,8); ctx.fill(); }
-  function wrapText(ctx,text,x,y,maxWidth,lineHeight){ const words=text.split(" "); let line=""; for (let n=0;n<words.length;n++){ const test=line+words[n]+" "; if (ctx.measureText(test).width>maxWidth && n>0){ ctx.fillText(line,x,y); line=words[n]+" "; y+=lineHeight; } else line=test; } if (line) ctx.fillText(line,x,y); }
-}
-async function shareResultsImage(){
-  try{
-    const { blob, url } = await generateShareCard();
-    const file = new File([blob], "trading_score.png", { type:"image/png" });
-    if (navigator.canShare && navigator.canShare({ files:[file] })){ await navigator.share({ files:[file], title:"Trading Game Score" }); return; }
-    window.open(url, "_blank");
-  }catch(e){
-    shareResults();
-  }
-}
-
-// Tooltip bar component
-function Bar({label, value, tooltip}){
-  return React.createElement("div", { 
-    className:"p-3 rounded-2xl border border-slate-200 shadow-sm bg-white relative" 
-  }, [
-    React.createElement("div", { 
-      className:"flex items-center justify-between text-[13px] text-gray-500 mb-1" 
-    }, [
-      `${label} — ${Math.round(value)}%`,
-      React.createElement("span", { 
-        className:"ml-2 text-gray-400 cursor-pointer group relative" 
-      }, [
-        "ⓘ",
-        React.createElement("div", { 
-          className:"absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block bg-black text-white text-xs rounded px-2 py-1 whitespace-nowrap z-10" 
-        }, tooltip || "")
-      ])
-    ]),
-    React.createElement("div", { className:"w-full bg-slate-200 rounded h-3 overflow-hidden" },
-      React.createElement("div", { className:"h-3 bg-slate-900 rounded", style:{ width: Math.round(value)+"%" } })
-    )
-  ]);
-}
-
-return React.createElement("div", { className: endWrapper }, [
-  React.createElement("div", { key:"brand", className:"flex items-center justify-between" }, [
-    React.createElement(Brand, { size: isMobile?36:44, withText: true, text: "Freshers Fair — Liquidity Trading Game" }),
-    !isMobile && React.createElement("button", {
-      onClick: () => setWide(w => !w),
-      className:"px-3 py-2 rounded-xl border shadow-sm text-sm btn bg-white"
-    }, wide ? "↔ Compact" : "⤢ Fit width")
-  ]),
-  React.createElement("h2", { key:"e0", className:"text-2xl font-bold" }, "Round complete"),
-  React.createElement("div", { key:"e1", className:"grid md:grid-cols-3 gap-3 xl:gap-4" }, [
-    React.createElement("div", { key:"e1a", className:"p-3 rounded-2xl border border-slate-200 shadow-sm bg-white" },
-      React.createElement("div", { className:"text-xs text-gray-500" }, "Trader"),
-      React.createElement("div", { className:"text-2xl font-semibold" }, player)
-    ),
-    React.createElement("div", { key:"e1b", className:"p-3 rounded-2xl border border-slate-200 shadow-sm bg-white" },
-      React.createElement("div", { className:"text-xs text-gray-500" }, "Mode"),
-      React.createElement("div", { className:"text-2xl font-semibold" }, mode==="easy"?"Easy":"Normal")
-    ),
-    React.createElement("div", { key:"e1c", className:"p-3 rounded-2xl border border-slate-200 shadow-sm bg-white" },
-      React.createElement("div", { className:"text-xs text-gray-500" }, "Total Value"),
-      React.createElement("div", { className:"text-2xl font-semibold" }, "$"+finalTotalText)
-    )
-  ]),
-  React.createElement("div", { key:"perf", className:"p-4 rounded-2xl border border-slate-200 shadow-sm bg-white space-y-3" }, [
-    React.createElement("div", { className:"text-sm font-semibold" }, "Performance summary"),
-    React.createElement("div", { className:"grid md:grid-cols-3 gap-3 xl:gap-4" }, [
-      React.createElement(Bar, { key:"b1", label:"Reaction Speed", value: reactionScore, tooltip:"Score drops 20% per second after news." }),
-      React.createElement(Bar, { key:"b2", label:"Directional Accuracy", value: accuracyScore, tooltip:"Traded with the news move." }),
-      React.createElement(Bar, { key:"b3", label:"Risk / Confidence", value: riskScore, tooltip:"Time-weighted average position as % of max." })
-    ]),
-    React.createElement("div", { className:"text-sm text-gray-700" },
-      tips.length ? tips.join(" ") : "Solid round. Keep refining execution timing and sizing.")
-  ]),
-
-  // Actions
-  React.createElement("div", { key:"e3", className:"mt-3 flex gap-2 flex-wrap" }, [
-    React.createElement("button", { 
-      onClick: shareResultsImage, 
-      className:"px-3 py-2 rounded-xl border shadow-sm font-medium btn bg-green-50"
-    }, "Share Image"),
-    React.createElement("button", { 
-      onClick: shareResults, 
-      className:"px-3 py-2 rounded-xl border shadow-sm font-medium btn bg-emerald-50"
-    }, "Share on WhatsApp (text)"),
-    React.createElement("button", { 
-      onClick:()=>setScreen("welcome"), 
-      className:"px-3 py-2 rounded-xl border shadow-sm font-medium btn hover:bg-slate-50" 
-    }, "Back to Start"),
-    React.createElement("button", {
-      onClick:()=>{ 
-        setScreen("play");
-        const dur=(mode==="easy")?90:120; setDuration(dur); setTimeLeft(dur);
-        setMid(100); setFair(100); setCash(100000); setReserve(0); setPos(0);
-        setTick(0); tickRef.current = 0;
-        setHist([{t:0, mid:100}]); setRegime("Calm"); setHeadline(null); setNotice("");
-        setAvail(1000); setRevertTicks(0); setRevertStrength(0); pauseUntilRef.current = 0;
-        newsEventsRef.current=[]; tradesRef.current=[]; avgPriceRef.current=null;
-        const now = Date.now(); startTimeRef.current=now; endTimeRef.current=now+dur*1000;
-        scheduleRef.current = (function(startMs, durSeconds){ 
-          const last = durSeconds - 15; 
-          const arr=[]; for(let s=15; s<=last; s+=15) arr.push(startMs + s*1000); 
-          return arr; 
-        })(now, dur);
-        nextNewsIdxRef.current=0;
-      },
-      className:"px-3 py-2 rounded-xl border shadow-sm font-medium btn hover:bg-emerald-50"
-    }, "Play Again")
-  ])
-]);
-  
-
-
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(React.createElement(Game));
+</script>
 </body>
 </html>
-
-
-
-
