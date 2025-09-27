@@ -1093,78 +1093,236 @@ return React.createElement("div", { className: endWrapper }, [
 
   // --- NEW PERFORMANCE PANEL (no leaderboard) ---
   React.createElement("div", { key:"perf", className:"p-4 rounded-2xl border border-slate-200 shadow-sm bg-white space-y-3" }, [
+// --- end screen (Performance Summary — replaces leaderboard) ---
+// helpers (local to this render)
+const clamp01 = x => Math.max(0, Math.min(1, x));
+const pct = x => Math.round(x);
+
+// Build per-news assessments using stored trade & news refs
+// Grade first trade within ~10s after each news:
+// - Easy: ~8 Hz (125ms/tick) → ~80 ticks
+// - Normal: ~10 Hz (100ms/tick) → ~100 ticks
+const windowTicks = (mode === "easy") ? 80 : 100;
+
+// Derive per-news metrics (subtract Easy pause; use actual trade size)
+const items = newsEventsRef.current.map(ne => {
+  const tickMs = (mode === "easy") ? 125 : 100;
+  const tradesInWindow = tradesRef.current.filter(tr => tr.t > ne.t && tr.t <= ne.t + windowTicks);
+  if (tradesInWindow.length === 0) return { reacted:false };
+
+  const firstTrade = tradesInWindow[0];
+  const deltaTicks = firstTrade.t - ne.t;
+  const reactedMs = Math.max(0, deltaTicks * tickMs - (ne.pauseMs || 0));
+
+  let correct = false;
+  if (ne.dir > 0 && firstTrade.side === "BUY")  correct = true;
+  if (ne.dir < 0 && firstTrade.side === "SELL") correct = true;
+  if (ne.dir === 0) correct = true;
+
+  // confidence alternative data kept in case we ever switch back:
+  const earlyTicks = Math.round(1500 / tickMs);
+  const tradesEarly = tradesInWindow.filter(tr => tr.t <= ne.t + earlyTicks);
+  const aggSize = tradesEarly.reduce((s, tr) => s + (typeof tr.size === "number" ? tr.size : 0), 0);
+
+  return {
+    reacted: true,
+    reactedMs,
+    correct,
+    firstSize: (typeof firstTrade.size === "number" ? firstTrade.size : 0),
+    aggSize
+  };
+});
+
+// Reaction score: 100% at ≤1.0s, then -20% per extra second (floor 0)
+const reacted = items.filter(x => x.reacted);
+const avgMs = reacted.length ? reacted.reduce((s,x)=>s + x.reactedMs, 0) / reacted.length : null;
+let reactionScore = 50; // default if no reactions
+if (avgMs != null) {
+  const sec = avgMs / 1000;
+  if (sec <= 1) reactionScore = 100;
+  else reactionScore = Math.max(0, Math.round(100 - 20 * (sec - 1)));
+}
+
+// Accuracy score
+const hasAccuracy = reacted.length>0;
+const correctCount = hasAccuracy ? reacted.filter(x=>x.correct).length : 0;
+const accuracyScore = hasAccuracy ? pct( (correctCount/reacted.length)*100 ) : 50;
+
+// Risk/Confidence: time-weighted average |position| over the whole round (tick-weighted)
+const totalTicks = Math.max(1, tickRef.current);
+let twPos = 0;
+let curPos = 0;
+let lastTick = 0;
+const sortedTrades = [...tradesRef.current].sort((a,b) => a.t - b.t);
+for (const tr of sortedTrades) {
+  const dur = Math.max(0, tr.t - lastTick);
+  twPos += dur * Math.abs(curPos);
+  const sz = (typeof tr.size === "number") ? tr.size : 0;
+  curPos += (tr.side === "BUY" ? +sz : -sz);
+  lastTick = tr.t;
+}
+const tailDur = Math.max(0, totalTicks - lastTick);
+twPos += tailDur * Math.abs(curPos);
+const riskScore = pct( clamp01( twPos / (totalTicks * MAX_POS) ) * 100 );
+
+// Short feedback
+const tips = [];
+if (accuracyScore >= 80) tips.push("Great directional trading!");
+else if (accuracyScore < 50) tips.push("Work on trading with the macro impulse.");
+if (reactionScore < 60) tips.push("React faster to headlines — execute earlier.");
+if (riskScore < 50) tips.push("Scale with conviction when the signal is clear.");
+
+const finalTotalText = (cashRef.current + reserveRef.current + posRef.current*midRef.current).toLocaleString();
+const finalPnl = (cashRef.current + reserveRef.current + posRef.current*midRef.current) - 100000;
+const endWrapper = isMobile ? "mx-auto w-full px-3 space-y-6" : (containerClass + " space-y-6");
+
+// ---------- Share: simple text ----------
+function shareResults(){
+  const msg = [
+    "Freshers Fair — Liquidity Trading Game",
+    `Trader: ${player} (${mode==="easy"?"Easy":"Normal"})`,
+    `P&L: $${fmt2(finalPnl)}`,
+    `Reaction: ${pct(reactionScore)}% · Accuracy: ${pct(accuracyScore)}% · Risk: ${pct(riskScore)}%`,
+    (tips && tips.length ? `Tip: ${tips.join(" ")}` : "")
+  ].filter(Boolean).join(" | ");
+
+  const wa = "https://wa.me/?text=" + encodeURIComponent(msg);
+  if (navigator.share) {
+    navigator.share({ text: msg }).catch(() => window.open(wa, "_blank"));
+  } else {
+    window.open(wa, "_blank");
+  }
+}
+
+// ---------- Share: image card (canvas → PNG → native share/open) ----------
+function hashStr(s){ let h = 2166136261>>>0; for(let i=0;i<s.length;i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619)>>>0; } return ("00000000"+h.toString(16)).slice(-8); }
+function loadImage(src){ return new Promise((resolve,reject)=>{ const img = new Image(); img.crossOrigin="anonymous"; img.onload=()=>resolve(img); img.onerror=reject; img.src=src; }); }
+async function generateShareCard(){
+  const W=1080,H=1350,PAD=64; const c=document.createElement("canvas"); c.width=W; c.height=H; const ctx=c.getContext("2d");
+  const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,"#0f172a"); g.addColorStop(0.7,"#111827"); g.addColorStop(1,"#0b1220"); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  const cardX=PAD,cardY=PAD+40,cardW=W-PAD*2,cardH=H-PAD*2-40; roundRect(ctx,cardX,cardY,cardW,cardH,28); ctx.fillStyle="#ffffff"; ctx.fill();
+  try{ const logo=await loadImage("assets/Kent_Invest_Logo.png"); ctx.drawImage(logo,cardX+32,cardY+24,96,96);}catch{}
+  ctx.fillStyle="#0f172a"; ctx.font="700 44px Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial"; ctx.fillText("Freshers Fair — Liquidity Trading Game", cardX+32+120, cardY+85);
+  ctx.font="600 34px Inter, system-ui, -apple-system"; ctx.fillStyle="#374151"; ctx.fillText(`Trader: ${player}   •   ${mode==="easy"?"Easy":"Normal"}`, cardX+32, cardY+160);
+  const pnlColor=finalPnl>=0?"#059669":"#dc2626"; ctx.font="700 90px Inter, system-ui, -apple-system"; ctx.fillStyle=pnlColor; ctx.fillText(`P&L  $${fmt2(finalPnl)}`, cardX+32, cardY+250);
+  const bars=[{label:"Reaction Speed",value:Math.round(reactionScore)},{label:"Directional Accuracy",value:Math.round(accuracyScore)},{label:"Risk / Confidence",value:Math.round(riskScore)}];
+  let y=cardY+330; bars.forEach(b=>{ drawBar(ctx,cardX+32,y,cardW-64,36,b.label,b.value); y+=120; });
+  ctx.font="500 28px Inter, system-ui, -apple-system"; ctx.fillStyle="#374151"; const tipLine=(tips&&tips.length)?tips.join(" "):"Solid round. Keep refining execution timing and sizing."; wrapText(ctx,tipLine,cardX+32,y,cardW-64,34); y+=90;
+  const stamp=new Date().toLocaleString(); const sig=hashStr(`${player}|${mode}|${fmt2(finalPnl)}|${reactionScore}|${accuracyScore}|${riskScore}|${stamp}`); ctx.font="400 22px Inter, system-ui, -apple-system"; ctx.fillStyle="#6b7280"; ctx.fillText(`Generated at ${stamp} • id:${sig}`, cardX+32, cardY+cardH-28);
+  const blob=await new Promise(res=>c.toBlob(res,"image/png",0.95)); const url=URL.createObjectURL(blob); return { blob, url };
+  function roundRect(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+  function drawBar(ctx,x,y,w,h,label,val){ ctx.font="600 30px Inter, system-ui, -apple-system"; ctx.fillStyle="#111827"; ctx.fillText(`${label} — ${val}%`, x, y); const yy=y+18; ctx.fillStyle="#e5e7eb"; roundRect(ctx,x,yy+16,w,h,8); ctx.fill(); const fw=Math.round(w*Math.max(0,Math.min(1,val/100))); ctx.fillStyle="#0f172a"; roundRect(ctx,x,yy+16,fw,h,8); ctx.fill(); }
+  function wrapText(ctx,text,x,y,maxWidth,lineHeight){ const words=text.split(" "); let line=""; for (let n=0;n<words.length;n++){ const test=line+words[n]+" "; if (ctx.measureText(test).width>maxWidth && n>0){ ctx.fillText(line,x,y); line=words[n]+" "; y+=lineHeight; } else line=test; } if (line) ctx.fillText(line,x,y); }
+}
+async function shareResultsImage(){
+  try{
+    const { blob, url } = await generateShareCard();
+    const file = new File([blob], "trading_score.png", { type:"image/png" });
+    if (navigator.canShare && navigator.canShare({ files:[file] })){ await navigator.share({ files:[file], title:"Trading Game Score" }); return; }
+    window.open(url, "_blank");
+  }catch(e){
+    shareResults();
+  }
+}
+
+// Tooltip bar component
+function Bar({label, value, tooltip}){
+  return React.createElement("div", { 
+    className:"p-3 rounded-2xl border border-slate-200 shadow-sm bg-white relative" 
+  }, [
+    React.createElement("div", { 
+      className:"flex items-center justify-between text-[13px] text-gray-500 mb-1" 
+    }, [
+      `${label} — ${Math.round(value)}%`,
+      React.createElement("span", { 
+        className:"ml-2 text-gray-400 cursor-pointer group relative" 
+      }, [
+        "ⓘ",
+        React.createElement("div", { 
+          className:"absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block bg-black text-white text-xs rounded px-2 py-1 whitespace-nowrap z-10" 
+        }, tooltip || "")
+      ])
+    ]),
+    React.createElement("div", { className:"w-full bg-slate-200 rounded h-3 overflow-hidden" },
+      React.createElement("div", { className:"h-3 bg-slate-900 rounded", style:{ width: Math.round(value)+"%" } })
+    )
+  ]);
+}
+
+return React.createElement("div", { className: endWrapper }, [
+  React.createElement("div", { key:"brand", className:"flex items-center justify-between" }, [
+    React.createElement(Brand, { size: isMobile?36:44, withText: true, text: "Freshers Fair — Liquidity Trading Game" }),
+    !isMobile && React.createElement("button", {
+      onClick: () => setWide(w => !w),
+      className:"px-3 py-2 rounded-xl border shadow-sm text-sm btn bg-white"
+    }, wide ? "↔ Compact" : "⤢ Fit width")
+  ]),
+  React.createElement("h2", { key:"e0", className:"text-2xl font-bold" }, "Round complete"),
+  React.createElement("div", { key:"e1", className:"grid md:grid-cols-3 gap-3 xl:gap-4" }, [
+    React.createElement("div", { key:"e1a", className:"p-3 rounded-2xl border border-slate-200 shadow-sm bg-white" },
+      React.createElement("div", { className:"text-xs text-gray-500" }, "Trader"),
+      React.createElement("div", { className:"text-2xl font-semibold" }, player)
+    ),
+    React.createElement("div", { key:"e1b", className:"p-3 rounded-2xl border border-slate-200 shadow-sm bg-white" },
+      React.createElement("div", { className:"text-xs text-gray-500" }, "Mode"),
+      React.createElement("div", { className:"text-2xl font-semibold" }, mode==="easy"?"Easy":"Normal")
+    ),
+    React.createElement("div", { key:"e1c", className:"p-3 rounded-2xl border border-slate-200 shadow-sm bg-white" },
+      React.createElement("div", { className:"text-xs text-gray-500" }, "Total Value"),
+      React.createElement("div", { className:"text-2xl font-semibold" }, "$"+finalTotalText)
+    )
+  ]),
+  React.createElement("div", { key:"perf", className:"p-4 rounded-2xl border border-slate-200 shadow-sm bg-white space-y-3" }, [
     React.createElement("div", { className:"text-sm font-semibold" }, "Performance summary"),
     React.createElement("div", { className:"grid md:grid-cols-3 gap-3 xl:gap-4" }, [
-React.createElement(Bar, { 
-  key:"b1", label:"Reaction Speed", value: reactionScore,
-  tooltip:"Score drops 20% per second after news."
-}),
-React.createElement(Bar, { 
-  key:"b2", label:"Directional Accuracy", value: accuracyScore,
-  tooltip:"Correctly traded in line with news direction."
-}),
-React.createElement(Bar, { 
-  key:"b3", label:"Risk / Confidence", value: riskScore,
-  tooltip:"Average position size as % of max allowed."
-})
+      React.createElement(Bar, { key:"b1", label:"Reaction Speed", value: reactionScore, tooltip:"Score drops 20% per second after news." }),
+      React.createElement(Bar, { key:"b2", label:"Directional Accuracy", value: accuracyScore, tooltip:"Traded with the news move." }),
+      React.createElement(Bar, { key:"b3", label:"Risk / Confidence", value: riskScore, tooltip:"Time-weighted average position as % of max." })
     ]),
     React.createElement("div", { className:"text-sm text-gray-700" },
       tips.length ? tips.join(" ") : "Solid round. Keep refining execution timing and sizing.")
   ]),
 
   // Actions
-React.createElement("div", { key:"e3", className:"mt-3 flex gap-2 flex-wrap" }, [
-
-  // NEW: Share image (canvas → PNG → native share / open tab)
-  React.createElement("button", { 
-    onClick: shareResultsImage, 
-    className:"px-3 py-2 rounded-xl border shadow-sm font-medium btn bg-green-50"
-  }, "Share Image"),
-
-  // OPTIONAL: text-only WhatsApp share (nice fallback)
-  React.createElement("button", { 
-    onClick: shareResults, 
-    className:"px-3 py-2 rounded-xl border shadow-sm font-medium btn bg-emerald-50"
-  }, "Share on WhatsApp (text)"),
-
-  // Existing buttons (unchanged)
-  React.createElement("button", { 
-    onClick:()=>setScreen("welcome"), 
-    className:"px-3 py-2 rounded-xl border shadow-sm font-medium btn hover:bg-slate-50" 
-  }, "Back to Start"),
-
-  React.createElement("button", {
-    onClick:()=>{ 
-      setScreen("play");
-      const dur=(mode==="easy")?90:120; setDuration(dur); setTimeLeft(dur);
-      setMid(100); setFair(100); setCash(100000); setReserve(0); setPos(0);
-      setTick(0); tickRef.current = 0;
-      setHist([{t:0, mid:100}]); setRegime("Calm"); setHeadline(null); setNotice("");
-      setAvail(1000); setRevertTicks(0); setRevertStrength(0); pauseUntilRef.current = 0;
-      newsEventsRef.current=[]; tradesRef.current=[]; avgPriceRef.current=null;
-      const now = Date.now(); startTimeRef.current=now; endTimeRef.current=now+dur*1000;
-      scheduleRef.current = (function(startMs, durSeconds){ 
-        const last = durSeconds - 15; 
-        const arr=[]; for(let s=15; s<=last; s+=15) arr.push(startMs + s*1000); 
-        return arr; 
-      })(now, dur);
-      nextNewsIdxRef.current=0;
-    },
-    className:"px-3 py-2 rounded-xl border shadow-sm font-medium btn hover:bg-emerald-50"
-  }, "Play Again")
-])
-
-
-}
-
-
-      const root = ReactDOM.createRoot(document.getElementById("root"));
-      root.render(React.createElement(Game));
-    </script>
+  React.createElement("div", { key:"e3", className:"mt-3 flex gap-2 flex-wrap" }, [
+    React.createElement("button", { 
+      onClick: shareResultsImage, 
+      className:"px-3 py-2 rounded-xl border shadow-sm font-medium btn bg-green-50"
+    }, "Share Image"),
+    React.createElement("button", { 
+      onClick: shareResults, 
+      className:"px-3 py-2 rounded-xl border shadow-sm font-medium btn bg-emerald-50"
+    }, "Share on WhatsApp (text)"),
+    React.createElement("button", { 
+      onClick:()=>setScreen("welcome"), 
+      className:"px-3 py-2 rounded-xl border shadow-sm font-medium btn hover:bg-slate-50" 
+    }, "Back to Start"),
+    React.createElement("button", {
+      onClick:()=>{ 
+        setScreen("play");
+        const dur=(mode==="easy")?90:120; setDuration(dur); setTimeLeft(dur);
+        setMid(100); setFair(100); setCash(100000); setReserve(0); setPos(0);
+        setTick(0); tickRef.current = 0;
+        setHist([{t:0, mid:100}]); setRegime("Calm"); setHeadline(null); setNotice("");
+        setAvail(1000); setRevertTicks(0); setRevertStrength(0); pauseUntilRef.current = 0;
+        newsEventsRef.current=[]; tradesRef.current=[]; avgPriceRef.current=null;
+        const now = Date.now(); startTimeRef.current=now; endTimeRef.current=now+dur*1000;
+        scheduleRef.current = (function(startMs, durSeconds){ 
+          const last = durSeconds - 15; 
+          const arr=[]; for(let s=15; s<=last; s+=15) arr.push(startMs + s*1000); 
+          return arr; 
+        })(now, dur);
+        nextNewsIdxRef.current=0;
+      },
+      className:"px-3 py-2 rounded-xl border shadow-sm font-medium btn hover:bg-emerald-50"
+    }, "Play Again")
+  ])
+]);
   
 
 
 </body>
 </html>
+
 
 
