@@ -80,57 +80,40 @@
         return isMobile;
       }
 
-     // ---------- Chart (edge-to-edge, VWAP, trade markers, news bubbles) ----------
+// ---------- Chart (edge-to-edge, VWAP, trade markers, news bubbles) ----------
 function PriceChart({
-  data, fairLine=null, heightVhDesktop=38, heightVhMobile=50,
+  data, fairLine=null, heightVhDesktop=38, heightVhMobile=65,
   newsEvents=[], trades=[], posAvg=null, posSide=0
 }){
   if (!data || data.length===0) return React.createElement("div",{className:"h-[40vh]"});
 
-  // layout
   const isMobile = (typeof window!=="undefined") && window.innerWidth<=480;
-  const cssH = isMobile ? `${heightVhMobile}vh` : `${heightVhDesktop}vh`;
 
-  // canvas space
+  // Desktop still uses vh height
+  const cssH = `${heightVhDesktop}vh`;
+
   const w = 2400, h = 560, BLEED = 10;
+  const ys = data.map(d=>d.mid);
 
-  // ----- scale (auto-zoom to recent window, tiny padding) -----
-  const recentCount = isMobile ? 240 : 360;       // last N ticks for y-scaling
+  // --- Y axis scaling (reduced pad to cut blank space) ---
+  let minY = Math.min(...ys), maxY = Math.max(...ys);
+  const yPad = Math.max(1e-6, (maxY - minY) * 0.005); // 0.5% padding only
+  minY -= yPad; maxY += yPad;
+  const rangeY = Math.max(1e-6, maxY-minY);
+
   const n = data.length;
   const firstTick = data[0].t;
-  const startIdx = Math.max(0, n - recentCount);
-  const recent = data.slice(startIdx);
-
-  // guard: if recent is empty fallback to all
-  const windowSeries = (recent.length ? recent : data).map(d => d.mid);
-  let minY = Math.min(...windowSeries), maxY = Math.max(...windowSeries);
-
-  // if range is extremely small, ensure a minimum visual range (±0.25%)
-  const midY0 = (minY + maxY) / 2;
-  const minRangeAbs = Math.max(1e-6, midY0 * 0.0025); // 0.25%
-  if ((maxY - minY) < minRangeAbs){
-    minY = midY0 - minRangeAbs/2;
-    maxY = midY0 + minRangeAbs/2;
-  }
-
-  // small visual padding (2%)
-  const yPad = (maxY - minY) * 0.02;
-  minY -= yPad; maxY += yPad;
-  const rangeY = Math.max(1e-6, maxY - minY);
-
-  // helpers
   const toLocalIndex = absTick => absTick - firstTick;
+
   const xOfIndex = (i) => (-BLEED) + (i/Math.max(1,n-1))*(w+2*BLEED);
   const yOf = v => h - ((v-minY)/rangeY)*h;
 
-  // lines (full + recent emphasize)
   const pts = data.map((d,i)=>`${xOfIndex(i)},${yOf(d.mid)}`).join(" ");
-  const recentPts = (()=>{
-    const start = Math.max(0, n - 200);
-    return data.slice(start).map((d,i)=>`${xOfIndex(start+i)},${yOf(d.mid)}`).join(" ");
-  })();
+  const recentCount = 200;
+  const startRecent = Math.max(0, n - recentCount);
+  const recentPts = data.slice(startRecent).map((d,i)=>`${xOfIndex(startRecent+i)},${yOf(d.mid)}`).join(" ");
 
-  // y grid / ticks (5 desktop, 3 mobile)
+  // y-axis ticks
   const ticks = isMobile?3:5;
   const tickFont = isMobile?"text-[12px]":"text-[14px]";
   const yTicks = [];
@@ -142,7 +125,7 @@ function PriceChart({
     );
   }
 
-  // VWAP line (if positioned)
+  // VWAP line if position open
   const vwapElems = [];
   if (posAvg != null && posSide !== 0){
     vwapElems.push(
@@ -151,7 +134,7 @@ function PriceChart({
     );
   }
 
-  // NEWS: bubble at bottom + dotted line up to top
+  // News bubbles
   const newsElems = [];
   const bubbleR = 18, newsColor = "#7c3aed";
   const bubbleY = h - (bubbleR + 6);
@@ -169,7 +152,7 @@ function PriceChart({
     );
   });
 
-  // TRADE markers
+  // Trade markers
   const tradeElems = trades.map((tr,idx)=>{
     const li = toLocalIndex(tr.t);
     if (li < 0 || li >= n) return null;
@@ -196,7 +179,14 @@ function PriceChart({
   ];
 
   return React.createElement("div",{className:"rounded-2xl border border-slate-200 shadow-sm bg-white chart-card"},
-    React.createElement("svg",{viewBox:`0 0 ${w} ${h}`,style:{width:"100%",height:cssH,display:"block"}},
+    React.createElement(
+      "svg",
+      {
+        viewBox:`0 0 ${w} ${h}`,
+        style: isMobile
+          ? { width:"100%", height:"62vw", display:"block" } // mobile: proportional, no tall whitespace
+          : { width:"100%", height:cssH, display:"block" }   // desktop: use vh height
+      },
       [
         React.createElement("defs",{key:"defs"},
           React.createElement("clipPath",{id:"clipAll"},
@@ -207,9 +197,8 @@ function PriceChart({
       ]
     )
   );
-}
-
-      // ---------- Macro news ----------
+}      
+// ---------- Macro news ----------
       const NEWS = [
         { h:"BoE cuts rates 50bps",            why:"Cheaper borrowing supports equities",              pct:+0.10 },
         { h:"BoE hikes rates 50bps",           why:"Higher rates weigh on valuations",                 pct:-0.10 },
