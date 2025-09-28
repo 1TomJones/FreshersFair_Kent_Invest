@@ -896,7 +896,7 @@ async function generateShareCard(opts = { skipImages:false }) {
 if (!opts.skipImages) {
   try {
     const logo = await loadImage(LOGO_PATH);
-    const LOGO_W = 176, LOGO_H = 176; // was 88×88
+    const LOGO_W = 140, LOGO_H = 140; // was 88×88
     ctx.drawImage(logo, cardX+28, cardY+20, LOGO_W, LOGO_H);
   } catch (e) {
     console.warn("Logo load failed:", e);
@@ -979,7 +979,7 @@ drawBadge(ctx, cardX+480, badgeY, `P&L ${_finalPnl>=0 ? "▲" : "▼"} $${fmt2(_
   if (!opts.skipImages && bannerH > 60) {
     try {
       const banner = await loadImage(BANNER_PATH);
-      drawImageCover(ctx, banner, bannerX, bannerY, bannerW, bannerH, 12);
+      drawImageContain(ctx, banner, bannerX, bannerY, bannerW, bannerH, 12);
     } catch (e) {
       console.warn("Banner load failed:", e);
     }
@@ -1046,6 +1046,7 @@ drawBadge(ctx, cardX+480, badgeY, `P&L ${_finalPnl>=0 ? "▲" : "▼"} $${fmt2(_
     else { ctx.drawImage(img, dx, dy, dw, dh); }
   }
 }
+
 
 
 async function shareResultsImage(){
