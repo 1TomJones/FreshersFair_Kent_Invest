@@ -977,13 +977,29 @@ drawBadge(ctx, cardX+480, badgeY, `P&L ${_finalPnl>=0 ? "▲" : "▼"} $${fmt2(_
   const bannerH = Math.max(0, cardY + cardH - bannerBottomPad - bannerY);
 
   if (!opts.skipImages && bannerH > 60) {
-    try {
-      const banner = await loadImage(BANNER_PATH);
-      drawImageContain(ctx, banner, bannerX, bannerY, bannerW, bannerH, 12);
-    } catch (e) {
-      console.warn("Banner load failed:", e);
-    }
+  try {
+    const banner = await loadImage(BANNER_PATH);
+
+    // Optional soft background behind the image (not a clip; no cropping)
+    ctx.fillStyle = "#f8fafc";
+    ctx.fillRect(bannerX, bannerY, bannerW, bannerH);
+
+    // Letterbox-fit the image so it is NEVER cropped.
+    const iw = banner.width, ih = banner.height;
+    const scale = Math.min(bannerW / iw, bannerH / ih);  // contain (no crop)
+    const drawW = Math.round(iw * scale);
+    const drawH = Math.round(ih * scale);
+    const dx = Math.round(bannerX + (bannerW - drawW) / 2);
+    const dy = Math.round(bannerY + (bannerH - drawH) / 2);
+
+    // Same simple draw as the logo: just drawImage with width/height — no clipping.
+    ctx.drawImage(banner, dx, dy, drawW, drawH);
+
+  } catch (e) {
+    console.warn("Banner load failed:", e);
   }
+}
+
 
   // Footer
   const stamp = new Date().toLocaleString();
