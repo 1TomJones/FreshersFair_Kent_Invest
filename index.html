@@ -80,112 +80,134 @@
         return isMobile;
       }
 
-      // ---------- Chart (edge-to-edge, VWAP, trade markers, news bubbles) ----------
-      function PriceChart({
-        data, fairLine=null, heightVhDesktop=38, heightVhMobile=85,
-        newsEvents=[], trades=[], posAvg=null, posSide=0
-      }){
-        if (!data || data.length===0) return React.createElement("div",{className:"h-[40vh]"});
-        const isMobile = (typeof window!=="undefined") && window.innerWidth<=480;
-        const cssH = isMobile ? `${heightVhMobile}vh` : `${heightVhDesktop}vh`;
+     // ---------- Chart (edge-to-edge, VWAP, trade markers, news bubbles) ----------
+function PriceChart({
+  data, fairLine=null, heightVhDesktop=38, heightVhMobile=50,
+  newsEvents=[], trades=[], posAvg=null, posSide=0
+}){
+  if (!data || data.length===0) return React.createElement("div",{className:"h-[40vh]"});
 
-        const w = 2400, h = 560, BLEED = 10, yPadPct = 0.02;
-        const ys = data.map(d=>d.mid);
-        let minY = Math.min(...ys), maxY = Math.max(...ys);
-        const midY = (minY + maxY)/2;
-        const halfR = Math.max(0.0001, (maxY - minY)/2);
-        minY = midY - halfR*(1+yPadPct);
-        maxY = midY + halfR*(1+yPadPct);
-        const rangeY = Math.max(1e-6, maxY-minY);
-        const n = data.length;
+  // layout
+  const isMobile = (typeof window!=="undefined") && window.innerWidth<=480;
+  const cssH = isMobile ? `${heightVhMobile}vh` : `${heightVhDesktop}vh`;
 
-        const firstTick = data[0].t;
-        const toLocalIndex = absTick => absTick - firstTick;
+  // canvas space
+  const w = 2400, h = 560, BLEED = 10;
 
-        const xOfIndex = (i) => (-BLEED) + (i/Math.max(1,n-1))*(w+2*BLEED);
-        const yOf = v => h - ((v-minY)/rangeY)*h;
+  // ----- scale (auto-zoom to recent window, tiny padding) -----
+  const recentCount = isMobile ? 240 : 360;       // last N ticks for y-scaling
+  const n = data.length;
+  const firstTick = data[0].t;
+  const startIdx = Math.max(0, n - recentCount);
+  const recent = data.slice(startIdx);
 
-        const pts = data.map((d,i)=>`${xOfIndex(i)},${yOf(d.mid)}`).join(" ");
-        const recentCount = 200;
-        const startRecent = Math.max(0, n - recentCount);
-        const recentPts = data.slice(startRecent).map((d,i)=>`${xOfIndex(startRecent+i)},${yOf(d.mid)}`).join(" ");
+  // guard: if recent is empty fallback to all
+  const windowSeries = (recent.length ? recent : data).map(d => d.mid);
+  let minY = Math.min(...windowSeries), maxY = Math.max(...windowSeries);
 
-        const ticks = isMobile?3:5;
-        const tickFont = isMobile?"text-[12px]":"text-[14px]";
-        const yTicks = [];
-        for(let k=0;k<ticks;k++){
-          const t=k/(ticks-1); const val=maxY - t*rangeY; const y=yOf(val);
-          yTicks.push(
-            React.createElement("line",{key:"gl"+k,x1:0,y1:y,x2:w,y2:y,stroke:"#eef2f7","stroke-width":1}),
-            React.createElement("text",{key:"gt"+k,x:8,y:y+5,"text-anchor":"start",className:`fill-gray-800 ${tickFont} font-semibold noselect`}, fmt2(val))
-          );
-        }
+  // if range is extremely small, ensure a minimum visual range (±0.25%)
+  const midY0 = (minY + maxY) / 2;
+  const minRangeAbs = Math.max(1e-6, midY0 * 0.0025); // 0.25%
+  if ((maxY - minY) < minRangeAbs){
+    minY = midY0 - minRangeAbs/2;
+    maxY = midY0 + minRangeAbs/2;
+  }
 
-        const vwapElems = [];
-        if (posAvg != null && posSide !== 0){
-          vwapElems.push(
-            React.createElement("line",{key:"vwap",x1:0,y1:yOf(posAvg),x2:w,y2:yOf(posAvg),stroke: posSide>0 ? "#10b981" : "#ef4444","stroke-width":2,"stroke-dasharray":"6 4",opacity:0.9}),
-            React.createElement("text",{key:"vwaplbl",x:w-6,y:yOf(posAvg)-6,"text-anchor":"end",className:`${posSide>0?"fill-emerald-600":"fill-rose-600"} text-[12px] font-semibold noselect`}, `VWAP ${posSide>0?"(long)":"(short)"} $${fmt2(posAvg)}`)
-          );
-        }
+  // small visual padding (2%)
+  const yPad = (maxY - minY) * 0.02;
+  minY -= yPad; maxY += yPad;
+  const rangeY = Math.max(1e-6, maxY - minY);
 
-        // NEWS: big bubble at bottom + purple dotted line to TOP (scrolls with data)
-        const newsElems = [];
-        const bubbleR = 18, newsColor = "#7c3aed";
-        const bubbleY = h - (bubbleR + 6);
-        newsEvents.forEach((e, idx) => {
-          const li = toLocalIndex(e.t);
-          if (li < 0 || li >= n) return;
-          const x = xOfIndex(li);
-          newsElems.push(
-            React.createElement("line", { key:`nline${idx}`, x1:x, y1:0, x2:x, y2:bubbleY - bubbleR,
-              stroke:newsColor, "stroke-width":1.8, "stroke-dasharray":"3 4", opacity:0.9 }),
-            React.createElement("circle", { key:`nb${idx}`, cx:x, cy:bubbleY, r:bubbleR,
-              fill:"#fff", stroke:newsColor, "stroke-width":2, opacity:0.98 }),
-            React.createElement("text", { key:`ntext${idx}`, x:x, y:bubbleY+5, "text-anchor":"middle",
-              className:"fill-gray-900 text-[14px] font-bold noselect" }, "N")
-          );
-        });
+  // helpers
+  const toLocalIndex = absTick => absTick - firstTick;
+  const xOfIndex = (i) => (-BLEED) + (i/Math.max(1,n-1))*(w+2*BLEED);
+  const yOf = v => h - ((v-minY)/rangeY)*h;
 
-        // TRADE markers
-        const tradeElems = trades.map((tr,idx)=>{
-          const li = toLocalIndex(tr.t);
-          if (li < 0 || li >= n) return null;
-          const x = xOfIndex(li), y = yOf(tr.price);
-          const isBuy = tr.side==="BUY";
-          const size = 6;
-          const points = isBuy
-            ? `${x},${y-size} ${x-size},${y+size} ${x+size},${y+size}`
-            : `${x},${y+size} ${x-size},${y-size} ${x+size},${y-size}`;
-          return React.createElement("polygon",{key:`tr${idx}`,points,fill:isBuy?"#2563eb":"#ef4444",opacity:0.9,stroke:"#0f172a","stroke-width":0.5});
-        }).filter(Boolean);
+  // lines (full + recent emphasize)
+  const pts = data.map((d,i)=>`${xOfIndex(i)},${yOf(d.mid)}`).join(" ");
+  const recentPts = (()=>{
+    const start = Math.max(0, n - 200);
+    return data.slice(start).map((d,i)=>`${xOfIndex(start+i)},${yOf(d.mid)}`).join(" ");
+  })();
 
-        const children = [
-          React.createElement("line",{key:"ax1",x1:0,y1:h,x2:w,y2:h,stroke:"#e5e7eb","stroke-width":1}),
-          React.createElement("line",{key:"ax2",x1:0,y1:0,x2:0,y2:h,stroke:"#e5e7eb","stroke-width":1}),
-          ...yTicks,
-          ...(fairLine!=null ? [React.createElement("line",{key:"fv",x1:0,y1:yOf(fairLine),x2:w,y2:yOf(fairLine),stroke:"#94a3b8","stroke-width":1.4,"stroke-dasharray":"4 4",opacity:0.85})] : []),
-          React.createElement("polyline",{key:"ply1",points:pts,fill:"none",stroke:"#0f172a","stroke-width":1.8,"stroke-opacity":0.5}),
-          React.createElement("polyline",{key:"ply2",points:recentPts,fill:"none",stroke:"#000","stroke-width":2.6,"stroke-opacity":0.95}),
-          ...tradeElems,
-          ...newsElems,
-          ...vwapElems,
-          React.createElement("text",{key:"ticks",x:w-8,y:16,"text-anchor":"end",className:"fill-gray-500 text-[11px] noselect"}, `ticks: ${n}`)
-        ];
+  // y grid / ticks (5 desktop, 3 mobile)
+  const ticks = isMobile?3:5;
+  const tickFont = isMobile?"text-[12px]":"text-[14px]";
+  const yTicks = [];
+  for(let k=0;k<ticks;k++){
+    const t=k/(ticks-1); const val=maxY - t*rangeY; const y=yOf(val);
+    yTicks.push(
+      React.createElement("line",{key:"gl"+k,x1:0,y1:y,x2:w,y2:y,stroke:"#eef2f7","stroke-width":1}),
+      React.createElement("text",{key:"gt"+k,x:8,y:y+5,"text-anchor":"start",className:`fill-gray-800 ${tickFont} font-semibold noselect`}, fmt2(val))
+    );
+  }
 
-        return React.createElement("div",{className:"rounded-2xl border border-slate-200 shadow-sm bg-white chart-card"},
-          React.createElement("svg",{viewBox:`0 0 ${w} ${h}`,style:{width:"100%",height:cssH,display:"block"}},
-            [
-              React.createElement("defs",{key:"defs"},
-                React.createElement("clipPath",{id:"clipAll"},
-                  React.createElement("rect",{x:0,y:0,width:w,height:h})
-                )
-              ),
-              React.createElement("g",{key:"g",clipPath:"url(#clipAll)"},children)
-            ]
+  // VWAP line (if positioned)
+  const vwapElems = [];
+  if (posAvg != null && posSide !== 0){
+    vwapElems.push(
+      React.createElement("line",{key:"vwap",x1:0,y1:yOf(posAvg),x2:w,y2:yOf(posAvg),stroke: posSide>0 ? "#10b981" : "#ef4444","stroke-width":2,"stroke-dasharray":"6 4",opacity:0.9}),
+      React.createElement("text",{key:"vwaplbl",x:w-6,y:yOf(posAvg)-6,"text-anchor":"end",className:`${posSide>0?"fill-emerald-600":"fill-rose-600"} text-[12px] font-semibold noselect`}, `VWAP ${posSide>0?"(long)":"(short)"} $${fmt2(posAvg)}`)
+    );
+  }
+
+  // NEWS: bubble at bottom + dotted line up to top
+  const newsElems = [];
+  const bubbleR = 18, newsColor = "#7c3aed";
+  const bubbleY = h - (bubbleR + 6);
+  newsEvents.forEach((e, idx) => {
+    const li = toLocalIndex(e.t);
+    if (li < 0 || li >= n) return;
+    const x = xOfIndex(li);
+    newsElems.push(
+      React.createElement("line", { key:`nline${idx}`, x1:x, y1:0, x2:x, y2:bubbleY - bubbleR,
+        stroke:newsColor, "stroke-width":1.8, "stroke-dasharray":"3 4", opacity:0.9 }),
+      React.createElement("circle", { key:`nb${idx}`, cx:x, cy:bubbleY, r:bubbleR,
+        fill:"#fff", stroke:newsColor, "stroke-width":2, opacity:0.98 }),
+      React.createElement("text", { key:`ntext${idx}`, x:x, y:bubbleY+5, "text-anchor":"middle",
+        className:"fill-gray-900 text-[14px] font-bold noselect" }, "N")
+    );
+  });
+
+  // TRADE markers
+  const tradeElems = trades.map((tr,idx)=>{
+    const li = toLocalIndex(tr.t);
+    if (li < 0 || li >= n) return null;
+    const x = xOfIndex(li), y = yOf(tr.price);
+    const isBuy = tr.side==="BUY";
+    const size = 6;
+    const points = isBuy
+      ? `${x},${y-size} ${x-size},${y+size} ${x+size},${y+size}`
+      : `${x},${y+size} ${x-size},${y-size} ${x+size},${y-size}`;
+    return React.createElement("polygon",{key:`tr${idx}`,points,fill:isBuy?"#2563eb":"#ef4444",opacity:0.9,stroke:"#0f172a","stroke-width":0.5});
+  }).filter(Boolean);
+
+  const children = [
+    React.createElement("line",{key:"ax1",x1:0,y1:h,x2:w,y2:h,stroke:"#e5e7eb","stroke-width":1}),
+    React.createElement("line",{key:"ax2",x1:0,y1:0,x2:0,y2:h,stroke:"#e5e7eb","stroke-width":1}),
+    ...yTicks,
+    ...(fairLine!=null ? [React.createElement("line",{key:"fv",x1:0,y1:yOf(fairLine),x2:w,y2:yOf(fairLine),stroke:"#94a3b8","stroke-width":1.4,"stroke-dasharray":"4 4",opacity:0.85})] : []),
+    React.createElement("polyline",{key:"ply1",points:pts,fill:"none",stroke:"#0f172a","stroke-width":1.8,"stroke-opacity":0.5}),
+    React.createElement("polyline",{key:"ply2",points:recentPts,fill:"none",stroke:"#000","stroke-width":2.6,"stroke-opacity":0.95}),
+    ...tradeElems,
+    ...newsElems,
+    ...vwapElems,
+    React.createElement("text",{key:"ticks",x:w-8,y:16,"text-anchor":"end",className:"fill-gray-500 text-[11px] noselect"}, `ticks: ${n}`)
+  ];
+
+  return React.createElement("div",{className:"rounded-2xl border border-slate-200 shadow-sm bg-white chart-card"},
+    React.createElement("svg",{viewBox:`0 0 ${w} ${h}`,style:{width:"100%",height:cssH,display:"block"}},
+      [
+        React.createElement("defs",{key:"defs"},
+          React.createElement("clipPath",{id:"clipAll"},
+            React.createElement("rect",{x:0,y:0,width:w,height:h})
           )
-        );
-      }
+        ),
+        React.createElement("g",{key:"g",clipPath:"url(#clipAll)"},children)
+      ]
+    )
+  );
+}
 
       // ---------- Macro news ----------
       const NEWS = [
@@ -622,7 +644,7 @@ newsEventsRef.current.push({
               data: hist,
               fairLine: fairRef.current,
               heightVhDesktop: 38,
-              heightVhMobile: 85,
+              heightVhMobile: 50,
               newsEvents: newsEventsRef.current,
               trades: tradesRef.current,
               posAvg,
@@ -683,7 +705,7 @@ newsEventsRef.current.push({
               data: hist,
               fairLine: fairRef.current,        // keep FV line on mobile (useful cue)
               heightVhDesktop: 38,
-              heightVhMobile: 85,
+              heightVhMobile: 50,
               newsEvents: newsEventsRef.current,
               trades: tradesRef.current,
               posAvg: avgPriceRef.current,
