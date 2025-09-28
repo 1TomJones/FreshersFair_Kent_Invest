@@ -82,34 +82,38 @@
 
 
 // ---------- Chart (mobile fills the card; no top/bottom dead space) ----------
+// ---------- Chart (mobile: more ticks, gentler zoom, no white bands) ----------
 function PriceChart({
-  data, fairLine=null, heightVhDesktop=38, heightVhMobile=72,
+  data, fairLine=null, heightVhDesktop=38, heightVhMobile=78,
   newsEvents=[], trades=[], posAvg=null, posSide=0
 }){
   if (!data || data.length===0) return React.createElement("div",{className:"h-[40vh]"});
 
   const isMobile = (typeof window!=="undefined") && window.innerWidth<=480;
 
-  // Show fewer ticks on mobile so the move is chunkier.
-  const MOBILE_TICKS = 220;
-  const seriesData   = isMobile ? data.slice(-MOBILE_TICKS) : data;
+  // Tunables (easy to tweak later)
+  const MOBILE_TICKS   = 320;  // show more history on phones
+  const FILL_FACTOR    = 0.85; // 1.0 = natural range; lower => taller-looking line
+  const MOBILE_PAD_PCT = 0.01; // small headroom so line/bubbles never clip
 
-  // Drawing box (kept constant)
+  // Slice fewer points on mobile so the move is chunkier but not cramped
+  const seriesData = isMobile ? data.slice(-MOBILE_TICKS) : data;
+
+  // Drawing box
   const w = 2400, h = 560, BLEED = 10;
 
-  // ---- Y-range from the visible slice
+  // Y range from the visible slice
   const ys = seriesData.map(d=>d.mid);
   let minY = Math.min(...ys), maxY = Math.max(...ys);
 
-  // Minimal headroom
-  const pad = (maxY - minY) * (isMobile ? 0.002 : 0.02); // ~0.2% vs 2%
+  // a tiny baseline headroom
+  const pad = (maxY - minY) * (isMobile ? MOBILE_PAD_PCT : 0.02);
   minY -= pad; maxY += pad;
 
-  // On mobile, deliberately shrink the range so the line fills the card vertically.
+  // On mobile, compress toward the mid a bit so it fills the card without looking “zoomed to oblivion”
   if (isMobile) {
     const mid  = (minY + maxY) / 2;
     const half = (maxY - minY) / 2;
-    const FILL_FACTOR = 0.60;           // 60% of natural range => line looks taller
     const newHalf = Math.max(1e-6, half * FILL_FACTOR);
     minY = mid - newHalf;
     maxY = mid + newHalf;
@@ -126,12 +130,12 @@ function PriceChart({
 
   // Lines
   const pts = seriesData.map((d,i)=>`${xOfIndex(i)},${yOf(d.mid)}`).join(" ");
-  const recentCount = Math.min(160, Math.floor(n*0.6));
+  const recentCount = Math.min(200, Math.floor(n*0.65));
   const startRecent = Math.max(0, n - recentCount);
   const recentPts = seriesData.slice(startRecent).map((d,i)=>`${xOfIndex(startRecent+i)},${yOf(d.mid)}`).join(" ");
 
   // Grid
-  const ticks = isMobile ? 2 : 5; // fewer labels on mobile
+  const ticks = isMobile ? 3 : 5;
   const tickFont = isMobile ? "text-[11px]" : "text-[14px]";
   const yTicks = [];
   for(let k=0;k<ticks;k++){
@@ -151,7 +155,7 @@ function PriceChart({
     );
   }
 
-  // News & trades limited to visible window
+  // News & trades (only those inside the visible window)
   const newsElems = [];
   const bubbleR = 18, newsColor = "#7c3aed";
   const bubbleY = h - (bubbleR + 6);
@@ -186,15 +190,15 @@ function PriceChart({
     React.createElement("line",{key:"ax2",x1:0,y1:0,x2:0,y2:h,stroke:"#e5e7eb","stroke-width":1}),
     ...yTicks,
     ...(fairLine!=null ? [React.createElement("line",{key:"fv",x1:0,y1:yOf(fairLine),x2:w,y2:yOf(fairLine),stroke:"#94a3b8","stroke-width":1.4,"stroke-dasharray":"4 4",opacity:0.85})] : []),
-    React.createElement("polyline",{key:"ply1",points:pts,fill:"none",stroke:"#0f172a","stroke-width":1.8,"stroke-opacity":0.5}),
-    React.createElement("polyline",{key:"ply2",points:recentPts,fill:"none",stroke:"#000","stroke-width":2.4,"stroke-opacity":0.95}),
+    React.createElement("polyline",{key:"ply1",points:pts,fill:"none",stroke:"#0f172a","stroke-width":isMobile?2.0:1.8,"stroke-opacity":0.5}),
+    React.createElement("polyline",{key:"ply2",points:recentPts,fill:"none",stroke:"#000","stroke-width":isMobile?2.8:2.6,"stroke-opacity":0.95}),
     ...tradeElems,
     ...newsElems,
     ...vwapElems,
     React.createElement("text",{key:"ticks",x:w-8,y:16,"text-anchor":"end",className:"fill-gray-500 text-[11px] noselect"}, `ticks: ${seriesData.length}`)
   ];
 
-  // Height: desktop uses vh; mobile fills and stretches the SVG (no letterboxing).
+  // Height/fit: desktop uses vh; mobile fills the container with stretch (no letterbox)
   return React.createElement("div",{className:"rounded-2xl border border-slate-200 shadow-sm bg-white chart-card"},
     React.createElement("svg",{
       viewBox:`0 0 ${w} ${h}`,
@@ -1214,5 +1218,6 @@ root.render(React.createElement(Game));
 </script>
 </body>
 </html>
+
 
 
