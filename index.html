@@ -892,28 +892,30 @@ async function generateShareCard(opts = { skipImages:false }) {
   roundRect(ctx, cardX, cardY, cardW, cardH, 28);
   ctx.fillStyle = "#ffffff"; ctx.fill();
 
-  // Logo (top-left)
-  if (!opts.skipImages) {
-    try {
-      const logo = await loadImage(LOGO_PATH);
-      ctx.drawImage(logo, cardX+28, cardY+20, 88, 88);
-    } catch (e) {
-      console.warn("Logo load failed:", e);
-    }
+// Logo (top-left) — 2× size
+if (!opts.skipImages) {
+  try {
+    const logo = await loadImage(LOGO_PATH);
+    const LOGO_W = 176, LOGO_H = 176; // was 88×88
+    ctx.drawImage(logo, cardX+28, cardY+20, LOGO_W, LOGO_H);
+  } catch (e) {
+    console.warn("Logo load failed:", e);
   }
+}
 
   // Title
   ctx.fillStyle = "#0f172a";
   ctx.font = "700 40px Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial";
-  ctx.fillText("Freshers Fair — Liquidity Trading Game", cardX+28+100, cardY+72);
+  ctx.fillText("Freshers Fair — Liquidity Trading Game", cardX+28+200, cardY+72);
 
   // Badges
-  const badgeY = cardY + 120;
-  drawBadge(ctx, cardX+28,   badgeY, (mode==="easy" ? "Easy" : "Normal"));
-  drawBadge(ctx, cardX+160,  badgeY, `Ticker ${TICKER}`);
-  const _finalPnl = (cashRef.current + reserveRef.current + posRef.current*midRef.current) - 100000;
-  const pnlColor = (_finalPnl>=0 ? "#059669" : "#dc2626");
-  drawBadge(ctx, cardX+320,  badgeY, `P&L ${_finalPnl>=0 ? "▲" : "▼"} $${fmt2(_finalPnl)}`, pnlColor);
+const badgeY = cardY + 120;
+drawBadge(ctx, cardX+180, badgeY, (mode==="easy" ? "Easy" : "Normal"));
+drawBadge(ctx, cardX+320, badgeY, `Ticker ${TICKER}`);
+const _finalPnl = (cashRef.current + reserveRef.current + posRef.current*midRef.current) - 100000;
+const pnlColor = (_finalPnl>=0 ? "#059669" : "#dc2626");
+drawBadge(ctx, cardX+480, badgeY, `P&L ${_finalPnl>=0 ? "▲" : "▼"} $${fmt2(_finalPnl)}`, pnlColor);
+
 
   // Metrics (short names)
   const labels = [
@@ -1113,6 +1115,7 @@ return React.createElement("div", { className: endWrapper }, [
     ]),
     React.createElement("div", { className:"text-sm text-gray-700" }, tips.length ? tips.join(" ") : "Solid round. Keep refining execution timing and sizing.")
   ]),
+
   React.createElement("div", { key:"e3", className:"mt-3 flex gap-2 flex-wrap" }, [
     React.createElement("button", { onClick: shareResultsImage, className:"px-3 py-2 rounded-xl border shadow-sm font-medium btn bg-green-50" }, "Share Image"),
 
