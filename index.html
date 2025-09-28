@@ -82,18 +82,14 @@
 
       // ---------- Chart (edge-to-edge, VWAP, trade markers, news bubbles) ----------
       function PriceChart({
-        data, fairLine=null, heightVhDesktop=38, heightVhMobile=38,
+        data, fairLine=null, heightVhDesktop=38, heightVhMobile=85,
         newsEvents=[], trades=[], posAvg=null, posSide=0
       }){
         if (!data || data.length===0) return React.createElement("div",{className:"h-[40vh]"});
         const isMobile = (typeof window!=="undefined") && window.innerWidth<=480;
         const cssH = isMobile ? `${heightVhMobile}vh` : `${heightVhDesktop}vh`;
 
-        const isMobile = (typeof window!=="undefined") && window.innerWidth<=480;
-const w = 2400, h = isMobile ? 600 : 560;   // slightly taller chart on mobile
-const BLEED = isMobile ? 0 : 10;            // no side bleed on mobile
-const yPadPct = isMobile ? 0.0 : 0.02;      // no vertical padding on mobile
-
+        const w = 2400, h = 560, BLEED = 10, yPadPct = 0.02;
         const ys = data.map(d=>d.mid);
         let minY = Math.min(...ys), maxY = Math.max(...ys);
         const midY = (minY + maxY)/2;
