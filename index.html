@@ -82,14 +82,18 @@
 
       // ---------- Chart (edge-to-edge, VWAP, trade markers, news bubbles) ----------
       function PriceChart({
-        data, fairLine=null, heightVhDesktop=38, heightVhMobile=85,
+        data, fairLine=null, heightVhDesktop=38, heightVhMobile=38,
         newsEvents=[], trades=[], posAvg=null, posSide=0
       }){
         if (!data || data.length===0) return React.createElement("div",{className:"h-[40vh]"});
         const isMobile = (typeof window!=="undefined") && window.innerWidth<=480;
         const cssH = isMobile ? `${heightVhMobile}vh` : `${heightVhDesktop}vh`;
 
-        const w = 2400, h = 560, BLEED = 10, yPadPct = 0.02;
+        const isMobile = (typeof window!=="undefined") && window.innerWidth<=480;
+const w = 2400, h = isMobile ? 600 : 560;   // slightly taller chart on mobile
+const BLEED = isMobile ? 0 : 10;            // no side bleed on mobile
+const yPadPct = isMobile ? 0.0 : 0.02;      // no vertical padding on mobile
+
         const ys = data.map(d=>d.mid);
         let minY = Math.min(...ys), maxY = Math.max(...ys);
         const midY = (minY + maxY)/2;
@@ -667,10 +671,15 @@ newsEventsRef.current.push({
           return React.createElement("div", { className:"mx-auto w-full px-3 space-y-3" }, [
             React.createElement("header", { key:"m0", className:"flex items-center justify-between" }, [
               React.createElement(Brand, { key:"b", size: 28, withText: false }),
-              React.createElement("div", { key:"rt", className:"flex items-center gap-2 text-xs" }, [
-                React.createElement("span", { className:"px-2 py-1 rounded-full border bg-white" }, `⏱ ${timeLeft}s`),
-                React.createElement("span", { className:"px-2 py-1 rounded-full border bg-white" }, (mode==="easy"?"Easy":"Normal"))
-              ])
+             React.createElement("div", { key:"rt", className:"flex items-center gap-2 text-xs" }, [
+  React.createElement("span", { className:"px-2 py-1 rounded-full border bg-white" }, `⏱ ${timeLeft}s`),
+  React.createElement("span", { className:"px-2 py-1 rounded-full border bg-white" }, (mode==="easy"?"Easy":"Normal")),
+  React.createElement("button", {
+    onClick: async()=>{ try{ if(!document.fullscreenElement){ await enterFullscreen(); setKiosk(true);} else { await exitFullscreen(); setKiosk(false);} }catch{} },
+    className:"px-2 py-1 rounded-full border bg-white"
+  }, document.fullscreenElement ? "⤢" : "⤢")
+])
+
             ]),
             React.createElement(NewsStrip, { key:"nb", headline, mode }),
             React.createElement(PriceChart, {
@@ -694,22 +703,27 @@ newsEventsRef.current.push({
                 React.createElement("div", { className:`text-lg font-semibold ${pnlColor}` }, "$"+fmt2(pnl))
               ])
             ]),
-            React.createElement("div", { key:"trade", className:"p-3 rounded-2xl border bg-white space-y-2" }, [
-              React.createElement("div", { className:"text-sm font-semibold" }, "Trade"),
-              React.createElement("div", { className:"flex items-center gap-2" }, [
-                React.createElement("input", {
-                  className:"flex-1 border rounded-xl px-3 py-2",
-                  type:"number", min:1, step:1, value:size,
-                  onChange:e=>setSize(clamp(Number(e.target.value)||0, 1, 1000000)),
-                  placeholder:"Size"
-                }),
-                React.createElement("button", { onClick:()=>trade("SELL"),
-                  className:"px-4 py-3 rounded-xl border shadow-sm font-semibold btn bg-rose-50 w-[38%]" }, "SELL"),
-                React.createElement("button", { onClick:()=>trade("BUY"),
-                  className:"px-4 py-3 rounded-xl border shadow-sm font-semibold btn bg-emerald-50 w-[38%]" }, "BUY")
-              ]),
-              React.createElement("div", { className:"text-[11px] text-gray-500" }, "Fee 0.01% · Pos cap ±"+MAX_POS)
-            ])
+           React.createElement("div", { key:"trade", className:"p-3 rounded-2xl border bg-white space-y-3" }, [
+  React.createElement("div", { className:"text-sm font-semibold" }, "Trade"),
+  React.createElement("input", {
+    className:"w-full border rounded-xl px-3 py-3",
+    type:"number", min:1, step:1, value:size,
+    onChange:e=>setSize(clamp(Number(e.target.value)||0, 1, 1000000)),
+    placeholder:"Order size (shares)"
+  }),
+  React.createElement("div", { className:"flex flex-col gap-2" }, [
+    React.createElement("button", {
+      onClick:()=>trade("BUY"),
+      className:"w-full px-4 py-3 rounded-xl border shadow-sm font-semibold btn bg-emerald-50"
+    }, "BUY"),
+    React.createElement("button", {
+      onClick:()=>trade("SELL"),
+      className:"w-full px-4 py-3 rounded-xl border shadow-sm font-semibold btn bg-rose-50"
+    }, "SELL")
+  ]),
+  React.createElement("div", { className:"text-[11px] text-gray-500" }, "Fee 0.01% · Pos cap ±"+MAX_POS)
+])
+
           ]);
         }
 
