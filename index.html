@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Freshers Fair — Liquidity Trading Game</title>
+    <title>Welcome Fair — Trading Game</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -56,7 +56,7 @@
       }
 
       // ---------- Brand (logo) ----------
-      function Brand({ size = 40, withText = false, text = "Freshers Fair — Liquidity Trading Game" }) {
+      function Brand({ size = 40, withText = false, text = "Welcome Fair — Trading Game" }) {
         return React.createElement("div", { className: "flex items-center gap-3" }, [
           React.createElement("img", {
             key: "logo",
@@ -751,7 +751,7 @@ if (screen==="welcome"){
 
   return React.createElement("div", { className: wrapperClass }, [
     React.createElement("div", { key:"brand", className:"flex items-center justify-between" }, [
-      React.createElement(Brand, { size: isMobile?36:44, withText: true, text: "Freshers Fair — Liquidity Trading Game" }),
+      React.createElement(Brand, { size: isMobile?36:44, withText: true, text: "Welcome Fair — Trading Game" }),
       !isMobile && React.createElement("button", {
         onClick: () => setWide(w => !w),
         className:"px-3 py-2 rounded-xl border shadow-sm text-sm btn bg-white"
@@ -906,7 +906,7 @@ if (!opts.skipImages) {
   // Title
   ctx.fillStyle = "#0f172a";
   ctx.font = "700 40px Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial";
-  ctx.fillText("Freshers Fair — Liquidity Trading Game", cardX+28+200, cardY+72);
+  ctx.fillText("Welcome Fair — Trading Game", cardX+28+160, cardY+72);
 
   // Badges
 const badgeY = cardY + 120;
@@ -1046,6 +1046,25 @@ drawBadge(ctx, cardX+480, badgeY, `P&L ${_finalPnl>=0 ? "▲" : "▼"} $${fmt2(_
     else { ctx.drawImage(img, dx, dy, dw, dh); }
   }
 }
+function drawImageContain(ctx, img, x, y, w, h, radius=0){
+  const iw = img.width, ih = img.height, ir = iw/ih, rr = w/h;
+  let dw, dh, dx, dy;
+  if (ir > rr){           // wider: fit width
+    dw = w; dh = dw / ir;
+    dx = x; dy = y + (h - dh)/2;
+  } else {                // taller: fit height
+    dh = h; dw = dh * ir;
+    dx = x + (w - dw)/2; dy = y;
+  }
+  if (radius > 0){
+    roundRect(ctx, x, y, w, h, radius);
+    ctx.save(); ctx.clip();
+    ctx.drawImage(img, dx, dy, dw, dh);
+    ctx.restore();
+  } else {
+    ctx.drawImage(img, dx, dy, dw, dh);
+  }
+}
 
 
 
@@ -1089,7 +1108,7 @@ const endWrapper = isMobile ? "mx-auto w-full px-3 space-y-6" : (containerClass 
 
 return React.createElement("div", { className: endWrapper }, [
   React.createElement("div", { key:"brand", className:"flex items-center justify-between" }, [
-    React.createElement(Brand, { size: isMobile?36:44, withText: true, text: "Freshers Fair — Liquidity Trading Game" }),
+    React.createElement(Brand, { size: isMobile?36:44, withText: true, text: "Welcome Fair — Trading Game" }),
     !isMobile && React.createElement("button", { onClick: () => setWide(w => !w), className:"px-3 py-2 rounded-xl border shadow-sm text-sm btn bg-white" }, wide ? "↔ Compact" : "⤢ Fit width")
   ]),
   React.createElement("h2", { key:"e0", className:"text-2xl font-bold" }, "Round complete"),
@@ -1136,11 +1155,10 @@ return React.createElement("div", { className: endWrapper }, [
   ])
 ]);
 
-} // <-- closes function Game(
+} // <-- closes function Game()
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(React.createElement(Game));
 </script>
 </body>
 </html>
-
