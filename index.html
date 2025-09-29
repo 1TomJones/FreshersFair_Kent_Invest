@@ -743,7 +743,6 @@ newsEventsRef.current.push({
             ])
           ]);
         }
-
 function MobileLayout(){
   return React.createElement("div", { className:"mx-auto w-full px-3 space-y-3" }, [
 
@@ -820,6 +819,7 @@ function MobileLayout(){
   ]);
 }
 
+
 // ---------- Screens ----------
 if (screen==="welcome"){
   const lb = loadLB();
@@ -884,11 +884,32 @@ if (screen==="welcome"){
           onChange:e=>setDuration(clamp(Number(e.target.value)||120, 60, 600)),
           className:"w-full border rounded-xl px-3 py-2 mt-1" })
       ),
-      React.createElement("div", { key:"w1c", className:"flex gap-2" }, [
-        React.createElement("button", { onClick: start, className:"px-4 py-3 rounded-xl border shadow-sm font-semibold btn hover:bg-emerald-50" }, "Start Round"),
-        React.createElement("button", { onClick: enableSound, className:"px-4 py-3 rounded-xl border shadow-sm text-sm btn hover:bg-slate-50" }, soundOn ? "🔊 Sound on" : "🔇 Enable sound"),
-        !isMobile && React.createElement("button", { onClick: async()=>{ await (document.fullscreenElement? exitFullscreen():enterFullscreen()); }, className:"px-4 py-3 rounded-xl border shadow-sm text-sm btn hover:bg-slate-50" }, document.fullscreenElement ? "⤢ Exit Fullscreen" : "⤢ Fullscreen (Kiosk)")
-      ])
+      React.createElement("div", { key:"w1c", className:"flex flex-col sm:flex-row gap-2 w-full" }, [
+  // Start Round (always large)
+  React.createElement("button", {
+    onClick: start,
+    className:"w-full sm:w-auto px-4 py-3 rounded-xl border shadow-sm font-semibold btn hover:bg-emerald-50"
+  }, "Start Round"),
+
+  // Sound toggle (keeps smaller style)
+  React.createElement("button", {
+    onClick: enableSound,
+    className:"px-3 py-2 rounded-xl border shadow-sm text-sm btn hover:bg-slate-50"
+  }, soundOn ? "🔊 Sound on" : "🔇 Enable sound"),
+
+  // Fullscreen button: big on mobile, small on desktop
+  (isMobile
+    ? React.createElement("button", {
+        onClick: async()=>{ await (document.fullscreenElement? exitFullscreen():enterFullscreen()); },
+        className:"w-full mt-2 px-4 py-3 rounded-xl border shadow-sm font-semibold btn bg-slate-50"
+      }, document.fullscreenElement ? "⤢ Exit Fullscreen" : "⤢ Fullscreen (Kiosk)")
+    : React.createElement("button", {
+        onClick: async()=>{ await (document.fullscreenElement? exitFullscreen():enterFullscreen()); },
+        className:"px-3 py-2 rounded-xl border shadow-sm text-sm btn hover:bg-slate-50"
+      }, document.fullscreenElement ? "⤢ Exit Fullscreen" : "⤢ Fullscreen (Kiosk)")
+  )
+])
+
     ]),
     React.createElement("div", { key:"lb", className:"p-4 rounded-2xl border border-slate-200 shadow-sm bg-white" }, [
       React.createElement("div", { className:"text-sm font-semibold mb-2 flex items-center gap-2" }, [
