@@ -746,29 +746,36 @@ newsEventsRef.current.push({
 
 function MobileLayout(){
   return React.createElement("div", { className:"mx-auto w-full px-3 space-y-3" }, [
+
+    // Header: logo, timer/mode, fullscreen icon
     React.createElement("header", { key:"m0", className:"flex items-center justify-between" }, [
       React.createElement(Brand, { key:"b", size: 28, withText: false }),
       React.createElement("div", { key:"rt", className:"flex items-center gap-2 text-xs" }, [
         React.createElement("span", { className:"px-2 py-1 rounded-full border bg-white" }, `⏱ ${timeLeft}s`),
-        React.createElement("span", { className:"px-2 py-1 rounded-full border bg-white" }, (mode==="easy"?"Easy":"Normal"))
+        React.createElement("span", { className:"px-2 py-1 rounded-full border bg-white" }, (mode==="easy"?"Easy":"Normal")),
+        // Fullscreen icon button (mobile)
+        React.createElement("button", {
+          className:"px-2 py-1 rounded-full border bg-white btn",
+          onClick: async ()=>{ try { await toggleFullscreen(); } catch(e){} }
+        }, "⤢")
       ])
     ]),
 
     React.createElement(NewsStrip, { key:"nb", headline, mode }),
 
+    // Chart
     React.createElement(PriceChart, {
       key:"ch",
       data: hist,
       fairLine: fairRef.current,
-      heightVhDesktop: 38,   // ignored on mobile
-      heightVhMobile: 62,    // taller on mobile
-      mobileWindowPct: 0.60, // show last 60% of ticks on mobile
+      mobileWindowPct: 0.60,
       newsEvents: newsEventsRef.current,
       trades: tradesRef.current,
       posAvg: avgPriceRef.current,
       posSide: Math.sign(posRef.current)
     }),
 
+    // Quick stats
     React.createElement("div", { key:"quick", className:"grid grid-cols-2 gap-2" }, [
       React.createElement("div", { className:"p-2 rounded-xl border bg-white text-center" }, [
         React.createElement("div", { className:"text-[12px] text-gray-500" }, "Position"),
@@ -780,22 +787,39 @@ function MobileLayout(){
       ])
     ]),
 
-    React.createElement("div", { key:"trade", className:"p-3 rounded-2xl border bg-white space-y-2" }, [
-      React.createElement("div", { className:"text-sm font-semibold" }, "Trade"),
+    // Trade card with BIG fullscreen toggle
+    React.createElement("div", { key:"trade", className:"p-3 rounded-2xl border bg-white space-y-3" }, [
+      React.createElement("div", { className:"flex items-center justify-between" }, [
+        React.createElement("div", { className:"text-sm font-semibold" }, "Trade"),
+        React.createElement("button", {
+          className:"text-xs px-3 py-2 rounded-xl border shadow-sm btn",
+          onClick: async ()=>{ try { await toggleFullscreen(); } catch(e){} }
+        }, (document.fullscreenElement ? "⤢ Exit Fullscreen" : "⤢ Fullscreen"))
+      ]),
+
       React.createElement("input", {
         className:"w-full border rounded-xl px-3 py-2",
         type:"number", min:1, step:1, value:size,
         onChange:e=>setSize(clamp(Number(e.target.value)||0, 1, 1000000)),
         placeholder:"Size"
       }),
-      React.createElement("button", { onClick:()=>trade("BUY"),
-        className:"w-full px-4 py-3 rounded-xl border shadow-sm font-semibold btn bg-emerald-50" }, "BUY"),
-      React.createElement("button", { onClick:()=>trade("SELL"),
-        className:"w-full px-4 py-3 rounded-xl border shadow-sm font-semibold btn bg-rose-50" }, "SELL"),
+
+      // BIG stacked buttons (thumb-friendly)
+      React.createElement("button", {
+        onClick:()=>trade("BUY"),
+        className:"w-full px-4 py-3 rounded-xl border shadow-sm font-semibold btn bg-emerald-50 text-lg"
+      }, "BUY"),
+
+      React.createElement("button", {
+        onClick:()=>trade("SELL"),
+        className:"w-full px-4 py-3 rounded-xl border shadow-sm font-semibold btn bg-rose-50 text-lg"
+      }, "SELL"),
+
       React.createElement("div", { className:"text-[11px] text-gray-500" }, "Fee 0.01% · Pos cap ±"+MAX_POS)
     ])
   ]);
 }
+
 // ---------- Screens ----------
 if (screen==="welcome"){
   const lb = loadLB();
@@ -1261,6 +1285,7 @@ root.render(React.createElement(Game));
 </script>
 </body>
 </html>
+
 
 
 
