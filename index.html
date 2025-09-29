@@ -86,8 +86,8 @@ function PriceChart({
   data,
   fairLine = null,
   heightVhDesktop = 38,
-  heightVhMobile = 62,       // taller on mobile
-  mobileWindowPct = 0.60,    // show last 60% of ticks on mobile
+  heightVhMobile = 62,     // used on mobile
+  mobileWindowPct = 0.60,  // show last 60% of ticks on mobile
   newsEvents = [],
   trades = [],
   posAvg = null,
@@ -98,18 +98,16 @@ function PriceChart({
   const isMobile = (typeof window!=="undefined") && window.innerWidth <= 480;
   const cssH = isMobile ? `${heightVhMobile}vh` : `${heightVhDesktop}vh`;
 
-  // --- choose window of data ---
+  // window the series on mobile
   const nAll = data.length;
-  const nMobile = Math.max(60, Math.round(nAll * mobileWindowPct)); // floor of points to show
+  const nMobile = Math.max(60, Math.round(nAll * mobileWindowPct));
   const startIdx = isMobile ? Math.max(0, nAll - nMobile) : 0;
-  const series = data.slice(startIdx);   // what we will render
+  const series = data.slice(startIdx);
   const n = series.length;
 
-  // Canvas / viewBox size (kept constant; we scale to fit container with CSS)
   const w = 2400, h = 560, BLEED = 10;
-  const yPadPct = isMobile ? 0.00 : 0.02;  // no headroom on mobile, small on desktop
+  const yPadPct = isMobile ? 0.00 : 0.02;
 
-  // Y scale from the windowed series only
   const ys = series.map(d => d.mid);
   let minY = Math.min(...ys), maxY = Math.max(...ys);
   const midY = (minY + maxY)/2;
@@ -118,21 +116,17 @@ function PriceChart({
   maxY = midY + halfR*(1 + yPadPct);
   const rangeY = Math.max(1e-6, maxY - minY);
 
-  // Map absolute tick -> local index in the window
   const firstTick = series[0].t;
   const toLocalIndex = absTick => absTick - firstTick;
 
-  // X/Y mappers using windowed length
   const xOfIndex = (i) => (-BLEED) + (i/Math.max(1,n-1))*(w+2*BLEED);
   const yOf = v => h - ((v - minY)/rangeY)*h;
 
-  // Full and recent polylines
   const pts = series.map((d,i)=>`${xOfIndex(i)},${yOf(d.mid)}`).join(" ");
   const recentCount = Math.min(200, n);
   const startRecent = Math.max(0, n - recentCount);
   const recentPts = series.slice(startRecent).map((d,i)=>`${xOfIndex(startRecent+i)},${yOf(d.mid)}`).join(" ");
 
-  // Y tick grid
   const ticks = isMobile?3:5;
   const tickFont = isMobile?"text-[12px]":"text-[14px]";
   const yTicks = [];
@@ -146,7 +140,6 @@ function PriceChart({
     );
   }
 
-  // VWAP line if we have a live position
   const vwapElems = [];
   if (posAvg != null && posSide !== 0){
     vwapElems.push(
@@ -155,7 +148,6 @@ function PriceChart({
     );
   }
 
-  // NEWS markers (only those inside the window)
   const newsElems = [];
   const bubbleR = 18, newsColor = "#7c3aed";
   const bubbleY = h - (bubbleR + 6);
@@ -173,7 +165,6 @@ function PriceChart({
     );
   });
 
-  // TRADE markers in the window
   const tradeElems = trades.map((tr,idx)=>{
     const li = toLocalIndex(tr.t);
     if (li < 0 || li >= n) return null;
@@ -700,20 +691,18 @@ function MobileLayout(){
 
     React.createElement(NewsStrip, { key:"nb", headline, mode }),
 
-    // ▼▼ Replace your old PriceChart element with this one ▼▼
     React.createElement(PriceChart, {
       key:"ch",
       data: hist,
       fairLine: fairRef.current,
-      heightVhDesktop: 38,     // ignored on mobile
-      heightVhMobile: 62,      // taller on mobile
-      mobileWindowPct: 0.60,   // show last 60% of ticks on mobile
+      heightVhDesktop: 38,   // ignored on mobile
+      heightVhMobile: 62,    // taller on mobile
+      mobileWindowPct: 0.60, // show last 60% of ticks on mobile
       newsEvents: newsEventsRef.current,
       trades: tradesRef.current,
       posAvg: avgPriceRef.current,
       posSide: Math.sign(posRef.current)
     }),
-    // ▲▲ keep the trailing comma above; this is an item in the array ▲▲
 
     React.createElement("div", { key:"quick", className:"grid grid-cols-2 gap-2" }, [
       React.createElement("div", { className:"p-2 rounded-xl border bg-white text-center" }, [
@@ -1207,6 +1196,7 @@ root.render(React.createElement(Game));
 </script>
 </body>
 </html>
+
 
 
 
