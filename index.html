@@ -715,7 +715,7 @@ newsEventsRef.current.push({
   trades: tradesRef.current,
   posAvg: avgPriceRef.current,
   posSide: Math.sign(posRef.current)
-})
+}),
             React.createElement("div", { key:"quick", className:"grid grid-cols-2 gap-2" }, [
               React.createElement("div", { className:"p-2 rounded-xl border bg-white text-center" }, [
                 React.createElement("div", { className:"text-[12px] text-gray-500" }, "Position"),
@@ -1215,6 +1215,7 @@ root.render(React.createElement(Game));
 </script>
 </body>
 </html>
+
 
 
 
