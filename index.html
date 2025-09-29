@@ -81,72 +81,72 @@
       }
 
 
-// ---------- Chart (mobile fills the card; no top/bottom dead space) ----------
-// ---------- Chart (mobile: more ticks, gentler zoom, no white bands) ----------
+// ---------- Chart (edge-to-edge, VWAP, trade markers, news bubbles) ----------
 function PriceChart({
-  data, fairLine=null, heightVhDesktop=38, heightVhMobile=78,
-  newsEvents=[], trades=[], posAvg=null, posSide=0
+  data,
+  fairLine = null,
+  heightVhDesktop = 38,
+  heightVhMobile = 62,       // taller on mobile
+  mobileWindowPct = 0.60,    // show last 60% of ticks on mobile
+  newsEvents = [],
+  trades = [],
+  posAvg = null,
+  posSide = 0
 }){
-  if (!data || data.length===0) return React.createElement("div",{className:"h-[40vh]"});
+  if (!data || data.length === 0) return React.createElement("div",{className:"h-[40vh]"});
 
-  const isMobile = (typeof window!=="undefined") && window.innerWidth<=480;
+  const isMobile = (typeof window!=="undefined") && window.innerWidth <= 480;
+  const cssH = isMobile ? `${heightVhMobile}vh` : `${heightVhDesktop}vh`;
 
-  // Tunables (easy to tweak later)
-  const MOBILE_TICKS   = 320;  // show more history on phones
-  const FILL_FACTOR    = 0.85; // 1.0 = natural range; lower => taller-looking line
-  const MOBILE_PAD_PCT = 0.01; // small headroom so line/bubbles never clip
+  // --- choose window of data ---
+  const nAll = data.length;
+  const nMobile = Math.max(60, Math.round(nAll * mobileWindowPct)); // floor of points to show
+  const startIdx = isMobile ? Math.max(0, nAll - nMobile) : 0;
+  const series = data.slice(startIdx);   // what we will render
+  const n = series.length;
 
-  // Slice fewer points on mobile so the move is chunkier but not cramped
-  const seriesData = isMobile ? data.slice(-MOBILE_TICKS) : data;
-
-  // Drawing box
+  // Canvas / viewBox size (kept constant; we scale to fit container with CSS)
   const w = 2400, h = 560, BLEED = 10;
+  const yPadPct = isMobile ? 0.00 : 0.02;  // no headroom on mobile, small on desktop
 
-  // Y range from the visible slice
-  const ys = seriesData.map(d=>d.mid);
+  // Y scale from the windowed series only
+  const ys = series.map(d => d.mid);
   let minY = Math.min(...ys), maxY = Math.max(...ys);
-
-  // a tiny baseline headroom
-  const pad = (maxY - minY) * (isMobile ? MOBILE_PAD_PCT : 0.02);
-  minY -= pad; maxY += pad;
-
-  // On mobile, compress toward the mid a bit so it fills the card without looking “zoomed to oblivion”
-  if (isMobile) {
-    const mid  = (minY + maxY) / 2;
-    const half = (maxY - minY) / 2;
-    const newHalf = Math.max(1e-6, half * FILL_FACTOR);
-    minY = mid - newHalf;
-    maxY = mid + newHalf;
-  }
-
+  const midY = (minY + maxY)/2;
+  const halfR = Math.max(0.0001, (maxY - minY)/2);
+  minY = midY - halfR*(1 + yPadPct);
+  maxY = midY + halfR*(1 + yPadPct);
   const rangeY = Math.max(1e-6, maxY - minY);
 
-  // X helpers relative to visible slice
-  const n = seriesData.length;
-  const firstTick = seriesData[0].t;
+  // Map absolute tick -> local index in the window
+  const firstTick = series[0].t;
   const toLocalIndex = absTick => absTick - firstTick;
+
+  // X/Y mappers using windowed length
   const xOfIndex = (i) => (-BLEED) + (i/Math.max(1,n-1))*(w+2*BLEED);
-  const yOf = v => h - ((v-minY)/rangeY)*h;
+  const yOf = v => h - ((v - minY)/rangeY)*h;
 
-  // Lines
-  const pts = seriesData.map((d,i)=>`${xOfIndex(i)},${yOf(d.mid)}`).join(" ");
-  const recentCount = Math.min(200, Math.floor(n*0.65));
+  // Full and recent polylines
+  const pts = series.map((d,i)=>`${xOfIndex(i)},${yOf(d.mid)}`).join(" ");
+  const recentCount = Math.min(200, n);
   const startRecent = Math.max(0, n - recentCount);
-  const recentPts = seriesData.slice(startRecent).map((d,i)=>`${xOfIndex(startRecent+i)},${yOf(d.mid)}`).join(" ");
+  const recentPts = series.slice(startRecent).map((d,i)=>`${xOfIndex(startRecent+i)},${yOf(d.mid)}`).join(" ");
 
-  // Grid
-  const ticks = isMobile ? 3 : 5;
-  const tickFont = isMobile ? "text-[11px]" : "text-[14px]";
+  // Y tick grid
+  const ticks = isMobile?3:5;
+  const tickFont = isMobile?"text-[12px]":"text-[14px]";
   const yTicks = [];
   for(let k=0;k<ticks;k++){
-    const t=k/(ticks-1); const val=maxY - t*(maxY-minY); const y=yOf(val);
+    const t = k/(ticks-1);
+    const val = maxY - t*rangeY;
+    const y = yOf(val);
     yTicks.push(
       React.createElement("line",{key:"gl"+k,x1:0,y1:y,x2:w,y2:y,stroke:"#eef2f7","stroke-width":1}),
-      React.createElement("text",{key:"gt"+k,x:8,y:y+5,"text-anchor":"start",className:`fill-gray-700 ${tickFont} font-semibold noselect`}, fmt2(val))
+      React.createElement("text",{key:"gt"+k,x:8,y:y+5,"text-anchor":"start",className:`fill-gray-800 ${tickFont} font-semibold noselect`}, fmt2(val))
     );
   }
 
-  // VWAP
+  // VWAP line if we have a live position
   const vwapElems = [];
   if (posAvg != null && posSide !== 0){
     vwapElems.push(
@@ -155,7 +155,7 @@ function PriceChart({
     );
   }
 
-  // News & trades (only those inside the visible window)
+  // NEWS markers (only those inside the window)
   const newsElems = [];
   const bubbleR = 18, newsColor = "#7c3aed";
   const bubbleY = h - (bubbleR + 6);
@@ -173,6 +173,7 @@ function PriceChart({
     );
   });
 
+  // TRADE markers in the window
   const tradeElems = trades.map((tr,idx)=>{
     const li = toLocalIndex(tr.t);
     if (li < 0 || li >= n) return null;
@@ -190,30 +191,25 @@ function PriceChart({
     React.createElement("line",{key:"ax2",x1:0,y1:0,x2:0,y2:h,stroke:"#e5e7eb","stroke-width":1}),
     ...yTicks,
     ...(fairLine!=null ? [React.createElement("line",{key:"fv",x1:0,y1:yOf(fairLine),x2:w,y2:yOf(fairLine),stroke:"#94a3b8","stroke-width":1.4,"stroke-dasharray":"4 4",opacity:0.85})] : []),
-    React.createElement("polyline",{key:"ply1",points:pts,fill:"none",stroke:"#0f172a","stroke-width":isMobile?2.0:1.8,"stroke-opacity":0.5}),
-    React.createElement("polyline",{key:"ply2",points:recentPts,fill:"none",stroke:"#000","stroke-width":isMobile?2.8:2.6,"stroke-opacity":0.95}),
+    React.createElement("polyline",{key:"ply1",points:pts,fill:"none",stroke:"#0f172a","stroke-width":1.8,"stroke-opacity":0.5}),
+    React.createElement("polyline",{key:"ply2",points:recentPts,fill:"none",stroke:"#000","stroke-width":2.6,"stroke-opacity":0.95}),
     ...tradeElems,
     ...newsElems,
     ...vwapElems,
-    React.createElement("text",{key:"ticks",x:w-8,y:16,"text-anchor":"end",className:"fill-gray-500 text-[11px] noselect"}, `ticks: ${seriesData.length}`)
+    React.createElement("text",{key:"ticks",x:w-8,y:16,"text-anchor":"end",className:"fill-gray-500 text-[11px] noselect"}, `ticks: ${n}`)
   ];
 
-  // Height/fit: desktop uses vh; mobile fills the container with stretch (no letterbox)
   return React.createElement("div",{className:"rounded-2xl border border-slate-200 shadow-sm bg-white chart-card"},
-    React.createElement("svg",{
-      viewBox:`0 0 ${w} ${h}`,
-      preserveAspectRatio: isMobile ? "none" : "xMidYMid meet",
-      style: isMobile
-        ? { width:"100%", height:`${heightVhMobile}vh`, display:"block" }
-        : { width:"100%", height:`${heightVhDesktop}vh`, display:"block" }
-    },[
-      React.createElement("defs",{key:"defs"},
-        React.createElement("clipPath",{id:"clipAll"},
-          React.createElement("rect",{x:0,y:0,width:w,height:h})
-        )
-      ),
-      React.createElement("g",{key:"g",clipPath:"url(#clipAll)"},children)
-    ])
+    React.createElement("svg",{viewBox:`0 0 ${w} ${h}`,style:{width:"100%",height:cssH,display:"block"}},
+      [
+        React.createElement("defs",{key:"defs"},
+          React.createElement("clipPath",{id:"clipAll"},
+            React.createElement("rect",{x:0,y:0,width:w,height:h})
+          )
+        ),
+        React.createElement("g",{key:"g",clipPath:"url(#clipAll)"},children)
+      ]
+    )
   );
 }
       
@@ -709,16 +705,17 @@ newsEventsRef.current.push({
             ]),
             React.createElement(NewsStrip, { key:"nb", headline, mode }),
             React.createElement(PriceChart, {
-              key:"ch",
-              data: hist,
-              fairLine: fairRef.current,        // keep FV line on mobile (useful cue)
-              heightVhDesktop: 38,
-              heightVhMobile: 50,
-              newsEvents: newsEventsRef.current,
-              trades: tradesRef.current,
-              posAvg: avgPriceRef.current,
-              posSide: Math.sign(posRef.current)
-            }),
+  key:"ch",
+  data: hist,
+  fairLine: fairRef.current,
+  heightVhDesktop: 38,      // ignored on mobile
+  heightVhMobile: 62,       // adjustable
+  mobileWindowPct: 0.60,    // show last 60% of ticks
+  newsEvents: newsEventsRef.current,
+  trades: tradesRef.current,
+  posAvg: avgPriceRef.current,
+  posSide: Math.sign(posRef.current)
+})
             React.createElement("div", { key:"quick", className:"grid grid-cols-2 gap-2" }, [
               React.createElement("div", { className:"p-2 rounded-xl border bg-white text-center" }, [
                 React.createElement("div", { className:"text-[12px] text-gray-500" }, "Position"),
@@ -1218,6 +1215,7 @@ root.render(React.createElement(Game));
 </script>
 </body>
 </html>
+
 
 
 
