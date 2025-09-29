@@ -212,7 +212,7 @@ function PriceChart({
       React.createElement("line", { key:`nline${idx}`, x1:x, y1:M.top, x2:x, y2:bubbleY - bubbleR,
         stroke:newsColor, "stroke-width":1.8, "stroke-dasharray":"3 4", opacity:0.9 }),
       React.createElement("circle", { key:`nb${idx}`, cx:x, cy:bubbleY, r:bubbleR,
-        fill:"#fff", stroke:newsColor, "stroke-width":2, opacity:0.98 }),
+        fill:"#fff", stroke:newsColor, "stroke-width":2, opacity:0.4 }),
       React.createElement("text", { key:`ntext${idx}`, x:x, y:bubbleY+5, "text-anchor":"middle",
         className:"fill-gray-900 text-[14px] font-bold noselect" }, "N")
     );
@@ -269,21 +269,123 @@ function PriceChart({
   );
 }
       
-// ---------- Macro news ----------
-      const NEWS = [
-        { h:"BoE cuts rates 50bps",            why:"Cheaper borrowing supports equities",              pct:+0.10 },
-        { h:"BoE hikes rates 50bps",           why:"Higher rates weigh on valuations",                 pct:-0.10 },
-        { h:"Fed signals strong dovish turn",  why:"Lower expected path of rates",                     pct:+0.08 },
-        { h:"Fed turns firmly hawkish",        why:"Higher-for-longer rates priced in",               pct:-0.08 },
-        { h:"Inflation cools well below forecast",  why:"Less pressure for hikes",                    pct:+0.05 },
-        { h:"Inflation jumps above expectations",  why:"Hike risks rise",                             pct:-0.05 },
-        { h:"Geopolitical tensions escalate",  why:"Risk-off tone hits indices",                      pct:-0.06 },
-        { h:"Geopolitical de-escalation",      why:"Risk-on tone improves",                           pct:+0.04 },
-        { h:"Mixed data; outlook unchanged",   why:"Little impact on fair value",                     pct: 0.00 },
-        { h:"Energy strength buoys index",     why:"Modest index uplift",                             pct:+0.02 },
-        { h:"Consumer weakens broadly",        why:"Modest index drag",                               pct:-0.02 },
-      ];
-      const pickNews = () => NEWS[Math.floor(Math.random()*NEWS.length)];
+
+// ---------- Macro news: simple per-scenario magnitudes (fairness by total) ----------
+// We keep fairness by ensuring each scenario's absolute moves sum to the same target.
+// For 120s rounds we use 7 events (15..105s); for 90s rounds we use 5 events (15..75s).
+
+const FAIR_SUM = { 90: 0.32, 120: 0.37 }; // totals must match (abs sum of % moves)
+const EPS = 1e-6;
+
+// Helpers to define events with explicit signed magnitudes
+const up   = (pct, h, why) => ({ pct:+pct, h, why });
+const down = (pct, h, why) => ({ pct:-pct, h, why });
+const flat = (h, why)      => ({ pct:0,   h, why });
+
+// NOTE: Each scenario BELOW already includes signed magnitudes.
+// Keep the same total |pct| across scenarios to maintain fairness.
+const SCENARIOS = [
+  {
+    id: "war_arc",
+    title: "Geopolitical Shock → Tension → De-escalation",
+    // 7 events totaling |pct| ≈ 0.37 (for 120s); first 5 total ≈ 0.32 (for 90s)
+    events: [
+      down(0.12, "Conflict erupts in a key region",
+        "Heightened uncertainty and risk-off flows hit global equities; energy prices lift, broader indices fall."),
+      down(0.07, "Sanctions & supply concerns rise",
+        "Trade disruptions and commodity volatility raise risk premia across markets."),
+      flat("Central banks monitor spillovers",
+        "Policy-makers signal readiness to act if financial conditions tighten excessively."),
+      up(0.04, "Ceasefire talks begin",
+        "Hopes for de-escalation modestly improve risk sentiment."),
+      down(0.03, "Fresh clashes stall negotiations",
+        "Setback injects caution; investors trim risk again."),
+      up(0.03, "Humanitarian corridors expand",
+        "Tensions ease marginally; equities grind higher."),
+      up(0.02, "Framework for ceasefire announced",
+        "Diplomatic progress supports a modest relief bid into the close.")
+    ]
+  },
+
+  {
+    id: "inflation_arc",
+    title: "Inflation Surprise → Policy Debate → Mixed Data",
+    events: [
+      up(0.12, "Inflation cools sharply vs. forecasts",
+        "Lower inflation reduces expected path of rates; duration and risk assets rally."),
+      flat("Fed officials caution against overreaction",
+        "Communication tempers exuberance; guidance remains data-dependent."),
+      up(0.06, "Retail sales resilient",
+        "Soft-landing vibe: growth holds while price pressures cool."),
+      down(0.04, "Wage growth re-accelerates",
+        "Sticky wage inflation revives hike fears; equities give back some gains."),
+      flat("PMIs mixed across regions",
+        "Manufacturing soft, services steady; net impact modest."),
+      up(0.03, "Core PCE in line",
+        "No fresh hawkish surprise; risk sentiment stabilizes upward."),
+      up(0.02, "Fed maintains pause",
+        "No hike and measured tone keep the soft-landing narrative intact.")
+    ]
+  },
+
+  {
+    id: "banking_arc",
+    title: "Bank Stress → Policy Backstop → Stabilization",
+    events: [
+      down(0.12, "Mid-size bank under severe pressure",
+        "Funding concerns trigger risk-off; financials lead declines."),
+      down(0.07, "Contagion fears spread",
+        "CDS widen; broad de-risking across equities."),
+      up(0.06, "Liquidity backstop announced",
+        "Emergency lending facility eases funding stress; markets rebound."),
+      flat("Supervisors intensify reviews",
+        "Uncertainty persists, but systemic safeguards are emphasized."),
+      up(0.03, "Stronger bank capital data",
+        "Improved confidence nudges indices higher."),
+      down(0.03, "Isolated downgrades hit sentiment",
+        "Idiosyncratic issues keep volatility elevated."),
+      up(0.02, "Deposits stabilize at regionals",
+        "Signs of normalization support a modest grind higher.")
+    ]
+  },
+
+  // Example of an extra scenario with the SAME totals (feel free to add more):
+  {
+    id: "china_growth_arc",
+    title: "China Growth Scare → Stimulus Hopes → Targeted Support",
+    events: [
+      down(0.12, "China growth data disappoints sharply",
+        "Global cyclicals and commodities sell off; broader indices weaken."),
+      flat("State media hints at policy review",
+        "Investors weigh the chance of targeted easing; uncertainty remains."),
+      up(0.06, "Targeted fiscal support flagged",
+        "Infrastructure and housing measures lift risk appetite modestly."),
+      down(0.04, "Property developer defaults",
+        "Credit worries resurface; momentum pares back."),
+      flat("Export orders stabilize",
+        "Signs of a floor but no decisive turn; limited market impact."),
+      up(0.03, "Reserve requirement cut floated",
+        "Liquidity backdrop improves; equities firm."),
+      up(0.02, "RRR cut confirmed",
+        "Easier financial conditions support a mild relief bid.")
+    ]
+  }
+];
+
+// Trim a scenario to match duration & check fairness.
+function scenarioForDuration(scn, durSeconds){
+  const expectedEvents = Math.max(1, Math.floor(durSeconds/15) - 1); // 90s→5, 120s→7
+  const trimmed = { ...scn, events: scn.events.slice(0, expectedEvents) };
+
+  // Fairness check: abs sum should match target for the duration
+  const target = FAIR_SUM[durSeconds] ?? FAIR_SUM[120];
+  const sumAbs = trimmed.events.reduce((s,e)=>s+Math.abs(e.pct), 0);
+  if (Math.abs(sumAbs - target) > EPS) {
+    console.warn(`Fairness sum mismatch for ${scn.id} @${durSeconds}s. got=${sumAbs.toFixed(3)} want=${target.toFixed(3)}`);
+  }
+  return trimmed;
+}
+
 
       // ---------- Fullscreen helpers ----------
       async function enterFullscreen(){ const el=document.documentElement; if(el.requestFullscreen) return el.requestFullscreen(); if(el.webkitRequestFullscreen) return el.webkitRequestFullscreen(); }
@@ -379,6 +481,9 @@ function PriceChart({
         const loopRef=useRef(null), startTimeRef=useRef(null), endTimeRef=useRef(null);
         const scheduleRef=useRef([]), nextNewsIdxRef=useRef(0);
         const revertTicksRef=useRef(0), revertStrengthRef=useRef(0);
+	const scenarioRef = useRef(null);      // holds the chosen scenario for the round
+	const newsSeqRef  = useRef([]);        // array of events actually used this round
+	const lastScenarioIdRef = useRef(null);   // remember last scenario used so we can avoid repeats
 
         // markers
         const newsEventsRef = useRef([]); // { t }
@@ -450,22 +555,43 @@ function PriceChart({
           return arr;
         }
 
-        function start(){
-          if(!player.trim()) return alert("Enter a name to start!");
-          resetRound();
+function start(){
+  if (!player.trim()) return alert("Enter a name to start!");
+  resetRound();
 
-          const dur = (mode === "easy") ? 90 : 120;
-          setDuration(dur); setTimeLeft(dur);
+  const dur = (mode === "easy") ? 90 : 120;
+  setDuration(dur);
+  setTimeLeft(dur);
 
-          setScreen("play");
-          const start = Date.now();
-          startTimeRef.current = start;
-          endTimeRef.current   = start + dur*1000;
+  // Pick a scenario at random and trim it to match duration (5 or 7 events)
+  const pickedScn = SCENARIOS[Math.floor(Math.random() * SCENARIOS.length)];
+  const trimmed   = scenarioForDuration(pickedScn, dur);
 
-          scheduleRef.current  = buildNewsSchedule(start, dur);
-          nextNewsIdxRef.current = 0;
-        }
+  // Keep for this round
+  scenarioRef.current = trimmed;
+  newsSeqRef.current  = trimmed.events.slice();
 
+  setScreen("play");
+
+  const startMs = Date.now();
+  startTimeRef.current = startMs;
+  endTimeRef.current   = startMs + dur * 1000;
+
+  // Strict 15s schedule: 15,30,...,(dur-15)
+  scheduleRef.current = (function buildNewsSchedule(sMs, dSec){
+    const last = dSec - 15;
+    const arr = [];
+    for (let s = 15; s <= last; s += 15) arr.push(sMs + s * 1000);
+    return arr;
+  })(startMs, dur);
+
+  // Ensure schedule length matches events count (trim if needed)
+  if (scheduleRef.current.length > newsSeqRef.current.length) {
+    scheduleRef.current = scheduleRef.current.slice(0, newsSeqRef.current.length);
+  }
+
+  nextNewsIdxRef.current = 0;
+}
         function pauseFor(ms){
           const now = Date.now();
           pauseUntilRef.current = Math.max(pauseUntilRef.current, now + ms);
@@ -475,96 +601,127 @@ function PriceChart({
           }
         }
 
-        // main loop
-        useEffect(() => {
-          if (screen!=="play") return;
-          if (loopRef.current) clearInterval(loopRef.current);
+// main loop
+useEffect(() => {
+  if (screen !== "play") return;
+  if (loopRef.current) clearInterval(loopRef.current);
 
-          const intervalMs = mode==="easy" ? 125 : 100; // ~8Hz vs 10Hz
+  const intervalMs = mode === "easy" ? 125 : 100; // ~8Hz vs 10Hz
 
-          loopRef.current = setInterval(() => {
-            const now = Date.now();
+  loopRef.current = setInterval(() => {
+    const now = Date.now();
 
-            if (now < pauseUntilRef.current) {
-              setTimeLeft(Math.max(0, Math.ceil((endTimeRef.current - now)/1000)));
-              return;
-            }
+    // respect Easy-mode pause window
+    if (now < pauseUntilRef.current) {
+      setTimeLeft(Math.max(0, Math.ceil((endTimeRef.current - now) / 1000)));
+      return;
+    }
 
-            const left = Math.max(0, Math.ceil((endTimeRef.current - now)/1000));
-            setTimeLeft(left);
+    // update visible countdown
+    const left = Math.max(0, Math.ceil((endTimeRef.current - now) / 1000));
+    setTimeLeft(left);
 
-            const sigmaPct = regime==="Calm" ? SIGMA_CALM_PCT : SIGMA_VOL_PCT;
-            const sigmaAbs = fairRef.current * sigmaPct;
-            let randomShock = (Math.random()*2 - 1) * sigmaAbs;
+    // random move + drift toward FV
+    const sigmaPct = regime === "Calm" ? SIGMA_CALM_PCT : SIGMA_VOL_PCT;
+    const sigmaAbs = fairRef.current * sigmaPct;
+    let randomShock = (Math.random() * 2 - 1) * sigmaAbs;
 
-            if (Math.random() < JUMP_PROB_TICK) {
-              const jMagPct = JUMP_MIN_PCT + Math.random()*(JUMP_MAX_PCT - JUMP_MIN_PCT);
-              randomShock += (Math.random()<0.5?-1:1) * fairRef.current * jMagPct;
-            }
+    if (Math.random() < JUMP_PROB_TICK) {
+      const jMagPct = JUMP_MIN_PCT + Math.random() * (JUMP_MAX_PCT - JUMP_MIN_PCT);
+      randomShock += (Math.random() < 0.5 ? -1 : 1) * fairRef.current * jMagPct;
+    }
 
-            const step = randomShock + driftTowardFair();
+    const step = randomShock + driftTowardFair();
 
-            setMid(m => {
-              const nm = Math.max(1, m + step);
-              setTick(t => {
-                const t2 = t + 1;
-                tickRef.current = t2;
-                setHist(h => [...h, { t: t2, mid: nm }].slice(-700));
-                return t2;
-              });
-              return nm;
-            });
+    // advance mid/tick/history
+    setMid(m => {
+      const nm = Math.max(1, m + step);
+      setTick(t => {
+        const t2 = t + 1;
+        tickRef.current = t2;
+        setHist(h => [...h, { t: t2, mid: nm }].slice(-700));
+        return t2;
+      });
+      return nm;
+    });
 
-            const repl = BASE_DEPTH * (REPLENISH_PER_SEC * (intervalMs/1000));
-            setAvail(a => clamp(a + repl, 50, BASE_DEPTH));
+    // refill liquidity & occasionally flip regime
+    const repl = BASE_DEPTH * (REPLENISH_PER_SEC * (intervalMs / 1000));
+    setAvail(a => clamp(a + repl, 50, BASE_DEPTH));
+    if (Math.random() < 0.03) setRegime(r => (r === "Calm" ? "Volatile" : "Calm"));
 
-            if (Math.random() < 0.03) setRegime(r => r==="Calm"?"Volatile":"Calm");
+   // === SCENARIO NEWS ONLY (no random pickNews) ===
+{
+  const idx = nextNewsIdxRef.current;
+  if (idx < scheduleRef.current.length && now >= scheduleRef.current[idx]) {
+    const seq = newsSeqRef.current || [];
+    const n = seq[idx]; // { h, why, pct }
 
-            // STRICT news schedule
-            const idx = nextNewsIdxRef.current;
-            if (idx < scheduleRef.current.length && now >= scheduleRef.current[idx]) {
-              const n = pickNews();
-              setHeadline(n);
-              if (soundOn) {
-                if (n.pct > 0) beep(740, 0.18, "sine", 0.03);
-                else if (n.pct < 0) beep(330, 0.18, "sine", 0.03);
-                else beep(520, 0.12, "sine", 0.02);
-              }
-// store direction (+1 / 0 / -1) and pct so end-screen can grade accuracy
-newsEventsRef.current.push({
-  t: tickRef.current,
-  price: midRef.current,
-  pct: n.pct,
-  dir: Math.sign(n.pct),     // +1 up, 0 flat, -1 down
-  pauseMs: (mode === "easy" ? 5000 : 0) // subtract this from reaction time
-});
+    if (n) {
+      // Update headline
+      setHeadline({ h: n.h, why: n.why, pct: n.pct });
 
+      // Sounds
+      if (soundOn) {
+        if (n.pct > 0) beep(740, 0.18, "sine", 0.03);
+        else if (n.pct < 0) beep(330, 0.18, "sine", 0.03);
+        else beep(520, 0.12, "sine", 0.02);
+      }
 
-              if (n.pct !== 0) setFair(f => Math.max(1, f * (1 + n.pct)));
-              nextNewsIdxRef.current = idx + 1;
-              if (mode === "easy") pauseFor(5000);
-            }
+      // Store for end-screen scoring
+      newsEventsRef.current.push({
+        t: tickRef.current,
+        price: midRef.current,
+        pct: n.pct,
+        dir: Math.sign(n.pct),             // +1 / 0 / -1
+        pauseMs: (mode === "easy" ? 5000 : 0)
+      });
 
-            if (left <= 0) {
-              clearInterval(loopRef.current); loopRef.current = null;
-              const finalTotal = cashRef.current + reserveRef.current + posRef.current * midRef.current;
-              const finalPnl = finalTotal - 100000;
-              if (soundOn) {
-                if (finalPnl > 0) chord([523.25, 659.25, 783.99], 0.6, 0.025);
-                else chord([196.00, 233.08, 261.63], 0.6, 0.025);
-              }
-              if (mode === "normal") {
-                const lb = loadLB();
-                const entry = { name: player.trim(), pnl: Number(finalPnl.toFixed(2)), total: Number(finalTotal.toFixed(2)), ts: now };
-                const next = [...lb, entry].sort((a,b)=>b.pnl-a.pnl).slice(0,50);
-                saveLB(next);
-              }
-              setScreen("end");
-            }
-          }, intervalMs);
+      // Move fair value by scripted %
+      if (n.pct !== 0) setFair(f => Math.max(1, f * (1 + n.pct)));
 
-          return () => { if (loopRef.current) { clearInterval(loopRef.current); loopRef.current=null; } };
-        }, [screen, duration, regime, soundOn, mode]);
+      // Advance & optional pause
+      nextNewsIdxRef.current = idx + 1;
+      if (mode === "easy") pauseFor(5000);
+    } else {
+      // No event found at this slot (safety)
+      nextNewsIdxRef.current = idx + 1;
+    }
+  }
+}
+
+   // === End-of-round ===
+    if (left <= 0) {
+      clearInterval(loopRef.current); loopRef.current = null;
+
+      const finalTotal = cashRef.current + reserveRef.current + posRef.current * midRef.current;
+      const finalPnl = finalTotal - 100000;
+
+      if (soundOn) {
+        if (finalPnl > 0) chord([523.25, 659.25, 783.99], 0.6, 0.025);
+        else chord([196.00, 233.08, 261.63], 0.6, 0.025);
+      }
+
+      if (mode === "normal") {
+        const lb = loadLB();
+        const entry = { name: player.trim(), pnl: Number(finalPnl.toFixed(2)), total: Number(finalTotal.toFixed(2)), ts: now };
+        const next = [...lb, entry].sort((a,b)=>b.pnl-a.pnl).slice(0,50);
+        saveLB(next);
+      }
+
+      setScreen("end");
+    }
+  }, intervalMs);                        // <-- closes setInterval(...)
+                                          //     and its callback: () => { ... }
+
+  // cleanup on effect re-run/unmount
+  return () => {
+    if (loopRef.current) {
+      clearInterval(loopRef.current);
+      loopRef.current = null;
+    }
+  };
+}, [screen, duration, regime, soundOn, mode]);  // <-- closes useEffect(...)
 
         // ----- VWAP helper (FIXED: pass old position) -----
         function updateAvgPriceAfterTrade(pOld, side, qty, vwap){
@@ -1306,10 +1463,6 @@ root.render(React.createElement(Game));
 </script>
 </body>
 </html>
-
-
-
-
 
 
 
